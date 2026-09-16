@@ -62,8 +62,10 @@ class Job:
     dataset_id: str
     cutoff_hz: float
     order: int
+    n_workers: int = 1
     status: JobStatus = JobStatus.CREATED
     progress: float = 0.0
     output_path: Optional[Path] = None
     error_message: Optional[str] = None
+    duration_sec: Optional[float] = None
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))

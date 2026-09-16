@@ -2,7 +2,7 @@ from PySide6.QtCore import QRunnable, QObject, Signal
 import threading
 
 class WorkerSignals(QObject):
-    progress = Signal(float)
+    progress = Signal(float, float)
     finished = Signal()
     error = Signal(str)
 

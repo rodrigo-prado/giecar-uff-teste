@@ -25,8 +25,10 @@ class DBJob(Base):
     dataset_id = Column(String, ForeignKey('datasets.id'))
     cutoff_hz = Column(Float)
     order = Column(Integer)
+    n_workers = Column(Integer, default=1)
     status = Column(String)
     output_path = Column(String, nullable=True)
+    duration_sec = Column(Float, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     
     dataset = relationship("DBDataset", back_populates="jobs")

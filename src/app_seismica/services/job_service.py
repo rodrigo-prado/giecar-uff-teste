@@ -5,12 +5,17 @@ import h5py
 import numpy as np
 from scipy import signal
 import segyio
+import time
+import concurrent.futures
+from collections import deque
 
 from app_seismica.core.models import Job, JobStatus, SeismicDataset, FilterParameters
 from app_seismica.core.database import init_db, DBDataset, DBJob
 
-ProgressCallback = Callable[[float], None]
+ProgressCallback = Callable[[float, float], None]
 
+def apply_sos_filter(sos, chunk):
+    return signal.sosfiltfilt(sos, chunk, axis=1)
 
 class FilterJobService:
     def __init__(self) -> None:
@@ -65,9 +70,11 @@ class FilterJobService:
                     dataset_id=db_job.dataset_id,
                     cutoff_hz=db_job.cutoff_hz,
                     order=db_job.order,
+                    n_workers=db_job.n_workers or 1,
                     status=status,
                     progress=100.0 if status == JobStatus.COMPLETED else 0.0,
-                    output_path=Path(db_job.output_path) if db_job.output_path else None
+                    output_path=Path(db_job.output_path) if db_job.output_path else None,
+                    duration_sec=db_job.duration_sec
                 )
                 self._jobs[job_id] = job
                 self._cancel_tokens[job_id] = threading.Event()
@@ -91,7 +98,7 @@ class FilterJobService:
                     session.add(db_dset)
                     session.commit()
 
-    def create_filter_job(self, dataset_id: str, cutoff_hz: float, order: int) -> Job:
+    def create_filter_job(self, dataset_id: str, cutoff_hz: float, order: int, n_workers: int = 1) -> Job:
         with self._lock:
             dataset = self._datasets.get(dataset_id)
             if not dataset:
@@ -106,6 +113,7 @@ class FilterJobService:
                     dataset_id=dataset_id,
                     cutoff_hz=cutoff_hz,
                     order=order,
+                    n_workers=n_workers,
                     status=JobStatus.CREATED.name
                 )
                 session.add(db_job)
@@ -118,6 +126,7 @@ class FilterJobService:
                 dataset_id=dataset_id,
                 cutoff_hz=cutoff_hz,
                 order=order,
+                n_workers=n_workers,
                 status=JobStatus.CREATED,
                 progress=0.0
             )
@@ -133,6 +142,7 @@ class FilterJobService:
                 if db_job:
                     db_job.status = job.status.name
                     db_job.output_path = str(job.output_path) if job.output_path else None
+                    db_job.duration_sec = job.duration_sec
                     session.commit()
         except Exception:
             pass
@@ -168,6 +178,9 @@ class FilterJobService:
 
         chunk_size = 500  # lê e processa em lotes de 500 traços
         total_traces = dataset.total_traces
+        
+        start_time = time.time()
+        total_pause_time = 0.0
 
         try:
             with segyio.open(str(dataset.source_path), mode="r", ignore_geometry=True) as sgy:
@@ -180,39 +193,72 @@ class FilterJobService:
                         chunks=(min(chunk_size, total_traces), dataset.n_samples)
                     )
 
-                    for start_idx in range(0, total_traces, chunk_size):
-                        # Verifica pausa
-                        if pause_token:
-                            pause_token.wait()
-                            
-                        # Ponto de checagem cooperativo de cancelamento
-                        if token.is_set():
+                    active_futures = deque()
+                    
+                    with concurrent.futures.ProcessPoolExecutor(max_workers=job.n_workers) as executor:
+                        for start_idx in range(0, total_traces, chunk_size):
+                            # Verifica pausa e contabiliza o tempo que ficou pausado
+                            if pause_token and not pause_token.is_set():
+                                p_start = time.time()
+                                pause_token.wait()
+                                total_pause_time += (time.time() - p_start)
+                                
+                            # Ponto de checagem cooperativo de cancelamento
+                            if token.is_set():
+                                executor.shutdown(wait=False, cancel_futures=True)
+                                with self._lock:
+                                    job.status = JobStatus.CANCELLED
+                                    self._update_job_status_in_db(job)
+                                self._cleanup_partial_output(output_h5)
+                                return
+
+                            end_idx = min(start_idx + chunk_size, total_traces)
+                            # Leitura de chunk
+                            raw_chunk = np.array([sgy.trace[i] for i in range(start_idx, end_idx)], dtype=np.float32)
+
+                            # Envia pro pool
+                            future = executor.submit(apply_sos_filter, sos, raw_chunk)
+                            active_futures.append((start_idx, end_idx, future))
+
+                            # Mantém fila no máximo 2x n_workers para não estourar RAM com dados lidos
+                            while len(active_futures) >= job.n_workers * 2:
+                                s_idx, e_idx, f = active_futures.popleft()
+                                # Escrita incremental
+                                dset[s_idx:e_idx, :] = f.result()
+
+                                # Emissão de progresso
+                                pct = (e_idx / total_traces) * 100.0
+                                current_dur = (time.time() - start_time) - total_pause_time
+                                with self._lock:
+                                    job.progress = pct
+                                    job.duration_sec = current_dur
+                                if progress_callback:
+                                    progress_callback(pct, current_dur)
+                                    
+                        # Descarrega os restantes
+                        while active_futures:
+                            if token.is_set():
+                                executor.shutdown(wait=False, cancel_futures=True)
+                                with self._lock:
+                                    job.status = JobStatus.CANCELLED
+                                    self._update_job_status_in_db(job)
+                                self._cleanup_partial_output(output_h5)
+                                return
+                                
+                            s_idx, e_idx, f = active_futures.popleft()
+                            dset[s_idx:e_idx, :] = f.result()
+                            pct = (e_idx / total_traces) * 100.0
+                            current_dur = (time.time() - start_time) - total_pause_time
                             with self._lock:
-                                job.status = JobStatus.CANCELLED
-                                self._update_job_status_in_db(job)
-                            self._cleanup_partial_output(output_h5)
-                            return
-
-                        end_idx = min(start_idx + chunk_size, total_traces)
-                        # Leitura de chunk
-                        raw_chunk = np.array([sgy.trace[i] for i in range(start_idx, end_idx)], dtype=np.float32)
-
-                        # Filtragem passa-baixa forward-backward (fase zero)
-                        filtered_chunk = signal.sosfiltfilt(sos, raw_chunk, axis=1)
-
-                        # Escrita incremental
-                        dset[start_idx:end_idx, :] = filtered_chunk
-
-                        # Emissão de progresso
-                        pct = (end_idx / total_traces) * 100.0
-                        with self._lock:
-                            job.progress = pct
-                        if progress_callback:
-                            progress_callback(pct)
+                                job.progress = pct
+                                job.duration_sec = current_dur
+                            if progress_callback:
+                                progress_callback(pct, current_dur)
 
             with self._lock:
                 job.status = JobStatus.COMPLETED
                 job.progress = 100.0
+                job.duration_sec = (time.time() - start_time) - total_pause_time
                 self._update_job_status_in_db(job)
 
         except Exception as exc:

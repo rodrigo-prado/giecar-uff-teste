@@ -2,7 +2,7 @@ from PySide6.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QLabel, QProgres
 from PySide6.QtCore import Qt
 
 class JobCard(QFrame):
-    def __init__(self, filename, cutoff, order, parent=None):
+    def __init__(self, filename, cutoff, order, n_workers=1, parent=None):
         super().__init__(parent)
         self.is_paused = False
         
@@ -12,7 +12,7 @@ class JobCard(QFrame):
         
         header_layout = QHBoxLayout()
         title = QLabel(filename)
-        params = QLabel(f"Corte: {cutoff} Hz | Ordem: {order}")
+        params = QLabel(f"Corte: {cutoff} Hz | Ordem: {order} | Processos: {n_workers}")
         params.setAlignment(Qt.AlignRight)
         
         header_layout.addWidget(title)
@@ -47,10 +47,20 @@ class JobCard(QFrame):
             self.is_paused = not self.is_paused
             if self.is_paused:
                 self.btn_pause.setText("Retomar")
-                self.update_status("Em Pausa...")
+                current_text = self.status_label.text()
+                if "(" in current_text:
+                    timer_part = current_text.split("(")[1]
+                    self.update_status(f"Em Pausa... ({timer_part}")
+                else:
+                    self.update_status("Em Pausa...")
             else:
                 self.btn_pause.setText("Pausar")
-                self.update_status("Processando...")
+                current_text = self.status_label.text()
+                if "(" in current_text:
+                    timer_part = current_text.split("(")[1]
+                    self.update_status(f"Processando (Retomado)... ({timer_part}")
+                else:
+                    self.update_status("Processando (Retomado)...")
             callback(self.is_paused)
         self.btn_pause.clicked.connect(on_pause)
         
@@ -60,8 +70,13 @@ class JobCard(QFrame):
     def set_view_callback(self, callback):
         self.btn_view.clicked.connect(callback)
 
-    def update_progress(self, value):
+    def update_progress(self, value, duration_sec):
         self.progress_bar.setValue(value)
+        if duration_sec is not None:
+            if self.is_paused:
+                self.status_label.setText(f"Em Pausa... ({duration_sec:.1f}s)")
+            else:
+                self.status_label.setText(f"Processando... ({duration_sec:.1f}s)")
 
     def update_status(self, text):
         self.status_label.setText(text)
@@ -72,9 +87,10 @@ class JobCard(QFrame):
         self.btn_cancel.setEnabled(False)
         self.btn_view.hide()
         
-    def set_finished(self, output_path):
+    def set_finished(self, output_path, duration_sec=None):
         self.progress_bar.setValue(100)
-        self.status_label.setText(f"Concluído! Salvo em: {output_path}")
+        dur_str = f" em {duration_sec:.1f}s" if duration_sec else ""
+        self.status_label.setText(f"Concluído{dur_str}! Salvo em: {output_path}")
         self.btn_pause.setEnabled(False)
         self.btn_cancel.setEnabled(False)
         self.btn_view.show()

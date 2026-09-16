@@ -59,6 +59,12 @@ class MainWindow(QMainWindow):
         self.spn_order.setRange(1, 12)
         self.spn_order.setValue(4)
         layout_filter.addWidget(self.spn_order)
+        
+        layout_filter.addWidget(QLabel("Número de Processos (Workers):"))
+        self.spn_workers = QSpinBox()
+        self.spn_workers.setRange(1, 32)
+        self.spn_workers.setValue(4)
+        layout_filter.addWidget(self.spn_workers)
 
         # Botão para adicionar o job foi movido para cá
         self.btn_executar = QPushButton("Adicionar à Fila")
@@ -151,7 +157,7 @@ class MainWindow(QMainWindow):
             if not dataset:
                 continue
                 
-            card = JobCard(f"[{job.id}] {dataset.name}", job.cutoff_hz, job.order)
+            card = JobCard(f"[{job.id}] {dataset.name}", job.cutoff_hz, job.order, job.n_workers)
             self.jobs_layout.insertWidget(0, card)
             self.all_job_cards[job.id] = card
             
@@ -162,7 +168,7 @@ class MainWindow(QMainWindow):
             card.set_view_callback(open_viewer)
             
             if job.status == JobStatus.COMPLETED:
-                card.set_finished(job.output_path)
+                card.set_finished(job.output_path, job.duration_sec)
             elif job.status == JobStatus.CANCELLED:
                 card.set_cancelled()
             elif job.status == JobStatus.FAILED:
@@ -210,6 +216,7 @@ class MainWindow(QMainWindow):
     def on_executar(self):
         cutoff = self.spn_cutoff.value()
         order = self.spn_order.value()
+        n_workers = self.spn_workers.value()
 
         if cutoff >= self.current_dataset.nyquist_frequency_hz:
             QMessageBox.critical(
@@ -219,10 +226,10 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            job = self.service.create_filter_job(self.current_dataset.id, cutoff, order)
+            job = self.service.create_filter_job(self.current_dataset.id, cutoff, order, n_workers)
 
             # Criar e adicionar o card à UI no topo
-            card = JobCard(f"[{job.id}] {self.current_dataset.name}", cutoff, order)
+            card = JobCard(f"[{job.id}] {self.current_dataset.name}", cutoff, order, job.n_workers)
             self.jobs_layout.insertWidget(0, card)
             self.all_job_cards[job.id] = card
             card.update_status("Processando chunks de traços...")
@@ -282,7 +289,7 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'active_workers') and job_id in self.active_workers:
             card = self.active_workers[job_id]["card"]
             if job.status == JobStatus.COMPLETED:
-                card.set_finished(job.output_path)
+                card.set_finished(job.output_path, job.duration_sec)
             elif job.status == JobStatus.CANCELLED:
                 card.set_cancelled()
             del self.active_workers[job_id]
