@@ -58,7 +58,7 @@ class SeismicDataset:
 
 @dataclass
 class Job:
-    id: str
+    id: str  # Será preenchido com a string da sequence
     dataset_id: str
     cutoff_hz: float
     order: int

@@ -9,7 +9,7 @@ def inspect_segy_metadata(filepath: Path) -> SeismicDataset:
     if not filepath.is_file():
         raise FileNotFoundError(f"Arquivo SEG-Y não encontrado: {filepath}")
 
-    with segyio.open(str(filepath), mode="r", ignore_geometry=True) as sgy:
+    with segyio.open(str(filepath), mode="r", ignore_geometry=True, strict=False) as sgy:
         try:
             n_ilines = len(sgy.ilines)
             n_xlines = len(sgy.xlines)

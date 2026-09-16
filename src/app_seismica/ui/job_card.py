@@ -59,6 +59,11 @@ class JobCard(QFrame):
     def update_status(self, text):
         self.status_label.setText(text)
         
+    def set_cancelled(self):
+        self.status_label.setText("Cancelado.")
+        self.btn_pause.setEnabled(False)
+        self.btn_cancel.setEnabled(False)
+        
     def set_finished(self, output_path):
         self.progress_bar.setValue(100)
         self.status_label.setText(f"Concluído! Salvo em: {output_path}")

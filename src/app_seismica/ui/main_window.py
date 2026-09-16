@@ -93,6 +93,25 @@ class MainWindow(QMainWindow):
         container.setLayout(main_layout)
         self.setCentralWidget(container)
 
+        self._restore_jobs()
+
+    def _restore_jobs(self):
+        jobs = self.service.list_jobs()
+        for job in jobs:
+            dataset = self.service._datasets.get(job.dataset_id)
+            if not dataset:
+                continue
+                
+            card = JobCard(dataset.name, job.cutoff_hz, job.order)
+            self.jobs_layout.insertWidget(0, card)
+            
+            if job.status == JobStatus.COMPLETED:
+                card.set_finished(job.output_path)
+            elif job.status == JobStatus.CANCELLED:
+                card.set_cancelled()
+            elif job.status == JobStatus.FAILED:
+                card.set_error(job.error_message or "Processo interrompido/falhou.")
+
     def on_select_file(self):
         project_root = Path(__file__).resolve().parent.parent.parent.parent
         default_dir = project_root / "data" / "raw"
@@ -126,7 +145,6 @@ class MainWindow(QMainWindow):
 
             self.group_filter.setEnabled(True)
             self.btn_executar.setEnabled(True)
-            # self.lbl_status.setText("Arquivo importado. Configure os parâmetros e clique em Executar.")
 
         except Exception as e:
             QMessageBox.critical(self, "Erro ao ler SEG-Y", f"Falha ao ler cabeçalhos:\n{str(e)}")
@@ -192,15 +210,6 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Erro ao criar Job", str(e))
 
-    def on_cancelar(self):
-        # Aqui podemos cancelar todos os jobs ativos ou limpar os cards,
-        # Como virou dispatcher, vamos cancelar todos.
-        if hasattr(self, 'active_workers'):
-            for jid, data in self.active_workers.items():
-                self.service.cancel_job(jid)
-                data["worker"].cancel_token.set()
-                data["card"].update_status("Cancelamento solicitado...")
-
     def on_sucesso(self, job_id):
         job = self.service.get_job_status(job_id)
         
@@ -209,7 +218,7 @@ class MainWindow(QMainWindow):
             if job.status == JobStatus.COMPLETED:
                 card.set_finished(job.output_path)
             elif job.status == JobStatus.CANCELLED:
-                card.update_status("Cancelado.")
+                card.set_cancelled()
             del self.active_workers[job_id]
 
     def on_erro(self, msg: str, job_id: str):
