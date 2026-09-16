@@ -2,9 +2,9 @@ from pathlib import Path
 from typing import Optional
 
 from PySide6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QScrollArea,
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QScrollArea,
     QLabel, QSpinBox, QDoubleSpinBox, QPushButton, 
-    QFileDialog, QMessageBox, QGroupBox
+    QFileDialog, QMessageBox, QGroupBox, QLineEdit, QComboBox
 )
 from PySide6.QtCore import QThreadPool, Qt
 
@@ -13,6 +13,7 @@ from app_seismica.core.segy_reader import inspect_segy_metadata
 from app_seismica.services.job_service import FilterJobService
 from app_seismica.ui.worker import FilterWorker
 from app_seismica.ui.job_card import JobCard
+from app_seismica.ui.trace_viewer import TraceViewerDialog
 
 
 class MainWindow(QMainWindow):
@@ -25,7 +26,7 @@ class MainWindow(QMainWindow):
         self.threadpool = QThreadPool.globalInstance()
 
         self.setWindowTitle("Processamento Sísmico - Filtro Passa-Baixa Butterworth")
-        self.resize(1000, 800)
+        self.resize(1400, 800)
 
         main_layout = QVBoxLayout()
 
@@ -72,6 +73,29 @@ class MainWindow(QMainWindow):
         group_exec = QGroupBox("Fila de Processamento")
         layout_exec = QVBoxLayout()
 
+        # --- Filtros ---
+        layout_filtros = QHBoxLayout()
+        layout_filtros.addWidget(QLabel("Filtrar por:"))
+        
+        self.txt_filter_id = QLineEdit()
+        self.txt_filter_id.setPlaceholderText("ID do Job")
+        self.txt_filter_id.textChanged.connect(self.apply_filters)
+        layout_filtros.addWidget(self.txt_filter_id)
+
+        self.txt_filter_dataset = QLineEdit()
+        self.txt_filter_dataset.setPlaceholderText("Nome do Dataset")
+        self.txt_filter_dataset.textChanged.connect(self.apply_filters)
+        layout_filtros.addWidget(self.txt_filter_dataset)
+
+        self.cmb_filter_status = QComboBox()
+        self.cmb_filter_status.addItem("Todos os Status", None)
+        for status in JobStatus:
+            self.cmb_filter_status.addItem(status.name, status)
+        self.cmb_filter_status.currentIndexChanged.connect(self.apply_filters)
+        layout_filtros.addWidget(self.cmb_filter_status)
+
+        layout_exec.addLayout(layout_filtros)
+
         # --- A Fila de Processamento (ScrollArea) ---
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
@@ -93,7 +117,32 @@ class MainWindow(QMainWindow):
         container.setLayout(main_layout)
         self.setCentralWidget(container)
 
+        self.all_job_cards = {}  # Mapeia job_id -> JobCard
+
         self._restore_jobs()
+
+    def apply_filters(self):
+        filter_id = self.txt_filter_id.text().strip().lower()
+        filter_dataset_name = self.txt_filter_dataset.text().strip().lower()
+        filter_status = self.cmb_filter_status.currentData()
+
+        for job_id, card in self.all_job_cards.items():
+            job = self.service._jobs.get(job_id)
+            if not job:
+                continue
+            
+            dataset = self.service._datasets.get(job.dataset_id)
+            dataset_name = dataset.name.lower() if dataset else ""
+            
+            show = True
+            if filter_id and filter_id not in job.id.lower():
+                show = False
+            if filter_dataset_name and filter_dataset_name not in dataset_name:
+                show = False
+            if filter_status and job.status != filter_status:
+                show = False
+                
+            card.setVisible(show)
 
     def _restore_jobs(self):
         jobs = self.service.list_jobs()
@@ -102,8 +151,15 @@ class MainWindow(QMainWindow):
             if not dataset:
                 continue
                 
-            card = JobCard(dataset.name, job.cutoff_hz, job.order)
+            card = JobCard(f"[{job.id}] {dataset.name}", job.cutoff_hz, job.order)
             self.jobs_layout.insertWidget(0, card)
+            self.all_job_cards[job.id] = card
+            
+            def open_viewer(checked=False, j=job, ds=dataset):
+                dialog = TraceViewerDialog(ds.source_path, j.output_path, ds.total_traces, self)
+                dialog.exec()
+            
+            card.set_view_callback(open_viewer)
             
             if job.status == JobStatus.COMPLETED:
                 card.set_finished(job.output_path)
@@ -111,6 +167,8 @@ class MainWindow(QMainWindow):
                 card.set_cancelled()
             elif job.status == JobStatus.FAILED:
                 card.set_error(job.error_message or "Processo interrompido/falhou.")
+        
+        self.apply_filters()
 
     def on_select_file(self):
         project_root = Path(__file__).resolve().parent.parent.parent.parent
@@ -164,9 +222,12 @@ class MainWindow(QMainWindow):
             job = self.service.create_filter_job(self.current_dataset.id, cutoff, order)
 
             # Criar e adicionar o card à UI no topo
-            card = JobCard(self.current_dataset.name, cutoff, order)
+            card = JobCard(f"[{job.id}] {self.current_dataset.name}", cutoff, order)
             self.jobs_layout.insertWidget(0, card)
+            self.all_job_cards[job.id] = card
             card.update_status("Processando chunks de traços...")
+            
+            self.apply_filters()
 
             # Mantém referência dos workers ativos se quiser cancelar todos
             if not hasattr(self, 'active_workers'):
@@ -196,6 +257,11 @@ class MainWindow(QMainWindow):
             card.set_pause_callback(on_pause_toggled)
             card.set_cancel_callback(on_cancel_clicked)
             
+            def open_viewer(checked=False):
+                dialog = TraceViewerDialog(self.current_dataset.source_path, job.output_path, self.current_dataset.total_traces, self)
+                dialog.exec()
+            card.set_view_callback(open_viewer)
+            
             # Precisamos usar um wrapper para passar o job_id correto nos sinais
             def on_finished(jid=job.id):
                 self.on_sucesso(jid)
@@ -220,11 +286,13 @@ class MainWindow(QMainWindow):
             elif job.status == JobStatus.CANCELLED:
                 card.set_cancelled()
             del self.active_workers[job_id]
+            self.apply_filters()
 
     def on_erro(self, msg: str, job_id: str):
         if hasattr(self, 'active_workers') and job_id in self.active_workers:
             self.active_workers[job_id]["card"].set_error(msg)
             del self.active_workers[job_id]
+            self.apply_filters()
 
     def _restaurar_estado_ui(self):
         self.btn_executar.setEnabled(True)

@@ -27,10 +27,14 @@ class JobCard(QFrame):
         self.btn_pause = QPushButton("Pausar")
         self.btn_cancel = QPushButton("Cancelar")
         
+        self.btn_view = QPushButton("Visualizar")
+        self.btn_view.hide()
+        
         # Conexões serão feitas pela MainWindow
         
         bottom_layout.addWidget(self.status_label)
         bottom_layout.addStretch()
+        bottom_layout.addWidget(self.btn_view)
         bottom_layout.addWidget(self.btn_pause)
         bottom_layout.addWidget(self.btn_cancel)
         
@@ -52,6 +56,9 @@ class JobCard(QFrame):
         
     def set_cancel_callback(self, callback):
         self.btn_cancel.clicked.connect(callback)
+        
+    def set_view_callback(self, callback):
+        self.btn_view.clicked.connect(callback)
 
     def update_progress(self, value):
         self.progress_bar.setValue(value)
@@ -63,15 +70,18 @@ class JobCard(QFrame):
         self.status_label.setText("Cancelado.")
         self.btn_pause.setEnabled(False)
         self.btn_cancel.setEnabled(False)
+        self.btn_view.hide()
         
     def set_finished(self, output_path):
         self.progress_bar.setValue(100)
         self.status_label.setText(f"Concluído! Salvo em: {output_path}")
         self.btn_pause.setEnabled(False)
         self.btn_cancel.setEnabled(False)
+        self.btn_view.show()
         
     def set_error(self, error_msg):
         self.status_label.setText(f"Erro: {error_msg}")
         self.btn_pause.setEnabled(False)
         self.btn_cancel.setEnabled(False)
+        self.btn_view.hide()
 
