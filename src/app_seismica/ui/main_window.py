@@ -2,16 +2,17 @@ from pathlib import Path
 from typing import Optional
 
 from PySide6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QSpinBox, QDoubleSpinBox, QPushButton, QProgressBar,
+    QMainWindow, QWidget, QVBoxLayout, QScrollArea,
+    QLabel, QSpinBox, QDoubleSpinBox, QPushButton, 
     QFileDialog, QMessageBox, QGroupBox
 )
-from PySide6.QtCore import QThreadPool
+from PySide6.QtCore import QThreadPool, Qt
 
 from app_seismica.core.models import JobStatus, SeismicDataset
 from app_seismica.core.segy_reader import inspect_segy_metadata
 from app_seismica.services.job_service import FilterJobService
 from app_seismica.ui.worker import FilterWorker
+from app_seismica.ui.job_card import JobCard
 
 
 class MainWindow(QMainWindow):
@@ -24,12 +25,12 @@ class MainWindow(QMainWindow):
         self.threadpool = QThreadPool.globalInstance()
 
         self.setWindowTitle("Processamento Sísmico - Filtro Passa-Baixa Butterworth")
-        self.resize(500, 420)
+        self.resize(1000, 800)
 
         main_layout = QVBoxLayout()
 
         # Seção 1: Selecionar Arquivo
-        group_import = QGroupBox("1. Selecionar Arquivo SEG-Y")
+        group_import = QGroupBox("Selecionar Arquivo SEG-Y")
         layout_import = QVBoxLayout()
         self.btn_select_file = QPushButton("Importar Arquivo .sgy / .segy")
         self.btn_select_file.clicked.connect(self.on_select_file)
@@ -41,7 +42,7 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(group_import)
 
         # Seção 2: Configurar Parâmetros do Filtro
-        self.group_filter = QGroupBox("2. Parâmetros do Filtro Butterworth")
+        self.group_filter = QGroupBox("Parâmetros do Filtro Butterworth")
         self.group_filter.setEnabled(False)
         layout_filter = QVBoxLayout()
 
@@ -58,30 +59,32 @@ class MainWindow(QMainWindow):
         self.spn_order.setValue(4)
         layout_filter.addWidget(self.spn_order)
 
+        # Botão para adicionar o job foi movido para cá
+        self.btn_executar = QPushButton("Adicionar à Fila")
+        self.btn_executar.setEnabled(False)
+        self.btn_executar.clicked.connect(self.on_executar)
+        layout_filter.addWidget(self.btn_executar)
+
         self.group_filter.setLayout(layout_filter)
         main_layout.addWidget(self.group_filter)
 
         # Seção 3: Execução e Controle
-        group_exec = QGroupBox("3. Execução")
+        group_exec = QGroupBox("Fila de Processamento")
         layout_exec = QVBoxLayout()
 
-        btn_box = QHBoxLayout()
-        self.btn_executar = QPushButton("Executar")
-        self.btn_executar.setEnabled(False)
-        self.btn_executar.clicked.connect(self.on_executar)
-        self.btn_cancelar = QPushButton("Cancelar")
-        self.btn_cancelar.setEnabled(False)
-        self.btn_cancelar.clicked.connect(self.on_cancelar)
-        btn_box.addWidget(self.btn_executar)
-        btn_box.addWidget(self.btn_cancelar)
-        layout_exec.addLayout(btn_box)
-
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setValue(0)
-        layout_exec.addWidget(self.progress_bar)
-
-        self.lbl_status = QLabel("Aguardando importação...")
-        layout_exec.addWidget(self.lbl_status)
+        # --- A Fila de Processamento (ScrollArea) ---
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setMinimumHeight(200) # Garante um espaço visual bacana
+        
+        # O container que vai segurar os cards lá dentro
+        self.jobs_container = QWidget()
+        self.jobs_layout = QVBoxLayout(self.jobs_container)
+        self.jobs_layout.setAlignment(Qt.AlignTop) # Empilha os cards de cima para baixo
+        
+        self.scroll_area.setWidget(self.jobs_container)
+        layout_exec.addWidget(self.scroll_area)
+        # ----------------------------------------------------------
 
         group_exec.setLayout(layout_exec)
         main_layout.addWidget(group_exec)
@@ -111,11 +114,11 @@ class MainWindow(QMainWindow):
 
             nyq = self.current_dataset.nyquist_frequency_hz
             self.lbl_file_info.setText(
-                f"<b>Arquivo:</b> {self.current_dataset.name}<br>"
-                f"<b>Amostragem:</b> {self.current_dataset.sample_rate_ms} ms | "
-                f"<b>Nyquist:</b> {nyq:.1f} Hz<br>"
-                f"<b>Total de Traços:</b> {self.current_dataset.total_traces:,} | "
-                f"<b>Amostras/traço:</b> {self.current_dataset.n_samples}"
+                f"Arquivo: {self.current_dataset.name} | "
+                f"Amostragem: {self.current_dataset.sample_rate_ms} ms | "
+                f"Nyquist: {nyq:.1f} Hz | "
+                f"Total de Traços: {self.current_dataset.total_traces:,} | "
+                f"Amostras/traço: {self.current_dataset.n_samples}"
             )
 
             self.spn_cutoff.setMaximum(nyq - 0.1)
@@ -123,7 +126,7 @@ class MainWindow(QMainWindow):
 
             self.group_filter.setEnabled(True)
             self.btn_executar.setEnabled(True)
-            self.lbl_status.setText("Arquivo importado. Configure os parâmetros e clique em Executar.")
+            # self.lbl_status.setText("Arquivo importado. Configure os parâmetros e clique em Executar.")
 
         except Exception as e:
             QMessageBox.critical(self, "Erro ao ler SEG-Y", f"Falha ao ler cabeçalhos:\n{str(e)}")
@@ -141,50 +144,79 @@ class MainWindow(QMainWindow):
 
         try:
             job = self.service.create_filter_job(self.current_dataset.id, cutoff, order)
-            self.active_job_id = job.id
 
-            self.btn_executar.setEnabled(False)
-            self.btn_select_file.setEnabled(False)
-            self.btn_cancelar.setEnabled(True)
-            self.progress_bar.setValue(0)
-            self.lbl_status.setText("Processando chunks de traços...")
+            # Criar e adicionar o card à UI no topo
+            card = JobCard(self.current_dataset.name, cutoff, order)
+            self.jobs_layout.insertWidget(0, card)
+            card.update_status("Processando chunks de traços...")
 
-            self.current_worker = FilterWorker(self.service, job.id)
-            self.current_worker.signals.progress.connect(self.on_progresso)
-            self.current_worker.signals.finished.connect(self.on_sucesso)
-            self.current_worker.signals.error.connect(self.on_erro)
+            # Mantém referência dos workers ativos se quiser cancelar todos
+            if not hasattr(self, 'active_workers'):
+                self.active_workers = {}
+            
+            worker = FilterWorker(self.service, job.id)
+            self.active_workers[job.id] = {"worker": worker, "card": card}
 
-            self.threadpool.start(self.current_worker)
+            # Configurações do Worker
+            worker.signals.progress.connect(card.update_progress)
+            
+            # Callbacks dos botões do Card
+            def on_pause_toggled(is_paused):
+                if is_paused:
+                    worker.pause_token.clear() # Vermelho = bloqueia thread
+                else:
+                    worker.pause_token.set()   # Verde = libera thread
+                    
+            def on_cancel_clicked():
+                self.service.cancel_job(job.id)
+                worker.cancel_token.set()
+                worker.pause_token.set() # Precisa destravar se estiver pausado para poder cancelar
+                card.update_status("Cancelamento solicitado...")
+                card.btn_pause.setEnabled(False)
+                card.btn_cancel.setEnabled(False)
+
+            card.set_pause_callback(on_pause_toggled)
+            card.set_cancel_callback(on_cancel_clicked)
+            
+            # Precisamos usar um wrapper para passar o job_id correto nos sinais
+            def on_finished(jid=job.id):
+                self.on_sucesso(jid)
+            def on_err(msg, jid=job.id):
+                self.on_erro(msg, jid)
+                
+            worker.signals.finished.connect(on_finished)
+            worker.signals.error.connect(on_err)
+
+            self.threadpool.start(worker)
 
         except Exception as e:
             QMessageBox.critical(self, "Erro ao criar Job", str(e))
 
     def on_cancelar(self):
-        if self.active_job_id and self.current_worker:
-            self.service.cancel_job(self.active_job_id)
-            self.current_worker.cancel_token.set()
-            self.lbl_status.setText("Cancelamento solicitado. Interrompendo...")
-            self.btn_cancelar.setEnabled(False)
+        # Aqui podemos cancelar todos os jobs ativos ou limpar os cards,
+        # Como virou dispatcher, vamos cancelar todos.
+        if hasattr(self, 'active_workers'):
+            for jid, data in self.active_workers.items():
+                self.service.cancel_job(jid)
+                data["worker"].cancel_token.set()
+                data["card"].update_status("Cancelamento solicitado...")
 
-    def on_progresso(self, pct: float):
-        self.progress_bar.setValue(int(pct))
+    def on_sucesso(self, job_id):
+        job = self.service.get_job_status(job_id)
+        
+        if hasattr(self, 'active_workers') and job_id in self.active_workers:
+            card = self.active_workers[job_id]["card"]
+            if job.status == JobStatus.COMPLETED:
+                card.set_finished(job.output_path)
+            elif job.status == JobStatus.CANCELLED:
+                card.update_status("Cancelado.")
+            del self.active_workers[job_id]
 
-    def on_sucesso(self):
-        job = self.service.get_job_status(self.active_job_id)
-        self._restaurar_estado_ui()
-        if job.status == JobStatus.COMPLETED:
-            self.lbl_status.setText(f"Concluído! Salvo em: {job.output_path}")
-            QMessageBox.information(self, "Sucesso", f"Filtragem finalizada!\nResultado salvo em:\n{job.output_path}")
-        elif job.status == JobStatus.CANCELLED:
-            self.lbl_status.setText("Processamento cancelado pelo usuário.")
-            QMessageBox.warning(self, "Cancelado", "A execução foi abortada e o arquivo parcial foi limpo.")
-
-    def on_erro(self, msg: str):
-        self._restaurar_estado_ui()
-        self.lbl_status.setText("Falha na execução.")
-        QMessageBox.critical(self, "Erro no Processamento", f"Ocorreu um erro durante a filtragem:\n{msg}")
+    def on_erro(self, msg: str, job_id: str):
+        if hasattr(self, 'active_workers') and job_id in self.active_workers:
+            self.active_workers[job_id]["card"].set_error(msg)
+            del self.active_workers[job_id]
 
     def _restaurar_estado_ui(self):
         self.btn_executar.setEnabled(True)
         self.btn_select_file.setEnabled(True)
-        self.btn_cancelar.setEnabled(False)

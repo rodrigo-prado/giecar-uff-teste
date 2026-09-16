@@ -55,7 +55,8 @@ class FilterJobService:
         self,
         job_id: str,
         progress_callback: Optional[ProgressCallback] = None,
-        cancel_token: Optional[threading.Event] = None
+        cancel_token: Optional[threading.Event] = None,
+        pause_token: Optional[threading.Event] = None
     ) -> None:
         with self._lock:
             job = self._jobs.get(job_id)
@@ -87,6 +88,10 @@ class FilterJobService:
                     )
 
                     for start_idx in range(0, total_traces, chunk_size):
+                        # Verifica pausa
+                        if pause_token:
+                            pause_token.wait()
+                            
                         # Ponto de checagem cooperativo de cancelamento
                         if token.is_set():
                             with self._lock:
