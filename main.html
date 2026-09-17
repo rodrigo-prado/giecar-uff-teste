@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="pt-BR" xml:lang="pt-BR"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.38">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Rodrigo A. P. da Silva">
+
+<title>Relatório Técnico - Solução App Sísmica</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+/* CSS for citations */
+div.csl-bib-body { }
+div.csl-entry {
+  clear: both;
+  margin-bottom: 1em;
+}
+.hanging-indent div.csl-entry {
+  margin-left:2em;
+  text-indent:-2em;
+}
+div.csl-left-margin {
+  min-width:2em;
+  float:left;
+}
+div.csl-right-inline {
+  margin-left:2em;
+  padding-left:1em;
+}
+div.csl-indent {
+  margin-left: 2em;
+}</style>
+
+
+<script src="main_files/libs/clipboard/clipboard.min.js"></script>
+<script src="main_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src="main_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="main_files/libs/quarto-html/popper.min.js"></script>
+<script src="main_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="main_files/libs/quarto-html/anchor.min.js"></script>
+<link href="main_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="main_files/libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="main_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="main_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="main_files/libs/bootstrap/bootstrap-72ae0a4edc05fb979d9f7dadc9e3230b.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="quarto-light">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-full">
+<div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+  <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Índice</h2>
+   
+  <ul>
+  <li><a href="#introdução" id="toc-introdução" class="nav-link active" data-scroll-target="#introdução"><span class="header-section-number">1</span> Introdução</a></li>
+  <li><a href="#decisões-de-desenvolvimento" id="toc-decisões-de-desenvolvimento" class="nav-link" data-scroll-target="#decisões-de-desenvolvimento"><span class="header-section-number">2</span> Decisões de Desenvolvimento</a>
+  <ul class="collapse">
+  <li><a href="#uso-de-protocols-do-python-duck-typing-estático" id="toc-uso-de-protocols-do-python-duck-typing-estático" class="nav-link" data-scroll-target="#uso-de-protocols-do-python-duck-typing-estático"><span class="header-section-number">2.1</span> Uso de <em>Protocols</em> do Python (Duck Typing Estático)</a></li>
+  <li><a href="#organização-de-diretórios-e-encapsulamento-de-módulos" id="toc-organização-de-diretórios-e-encapsulamento-de-módulos" class="nav-link" data-scroll-target="#organização-de-diretórios-e-encapsulamento-de-módulos"><span class="header-section-number">2.2</span> Organização de Diretórios e Encapsulamento de Módulos</a></li>
+  <li><a href="#modelagem-da-entidade-mínima-core-domain" id="toc-modelagem-da-entidade-mínima-core-domain" class="nav-link" data-scroll-target="#modelagem-da-entidade-mínima-core-domain"><span class="header-section-number">2.3</span> Modelagem da Entidade Mínima (Core Domain)</a></li>
+  </ul></li>
+  <li><a href="#arquitetura-e-interface" id="toc-arquitetura-e-interface" class="nav-link" data-scroll-target="#arquitetura-e-interface"><span class="header-section-number">3</span> Arquitetura e Interface</a>
+  <ul class="collapse">
+  <li><a href="#contratos-da-camada-de-negócio-e-validações-rígidas" id="toc-contratos-da-camada-de-negócio-e-validações-rígidas" class="nav-link" data-scroll-target="#contratos-da-camada-de-negócio-e-validações-rígidas"><span class="header-section-number">3.1</span> Contratos da Camada de Negócio e Validações Rígidas</a>
+  <ul class="collapse">
+  <li><a href="#regras-de-validação-no-create_filter_job" id="toc-regras-de-validação-no-create_filter_job" class="nav-link" data-scroll-target="#regras-de-validação-no-create_filter_job"><span class="header-section-number">3.1.1</span> Regras de Validação no <code>create_filter_job</code></a></li>
+  </ul></li>
+  <li><a href="#framework-base-e-responsividade" id="toc-framework-base-e-responsividade" class="nav-link" data-scroll-target="#framework-base-e-responsividade"><span class="header-section-number">3.2</span> Framework Base e Responsividade</a></li>
+  </ul></li>
+  <li><a href="#gerenciamento-de-memória-e-processamento-de-dados-streaming" id="toc-gerenciamento-de-memória-e-processamento-de-dados-streaming" class="nav-link" data-scroll-target="#gerenciamento-de-memória-e-processamento-de-dados-streaming"><span class="header-section-number">4</span> Gerenciamento de Memória e Processamento de Dados (Streaming)</a>
+  <ul class="collapse">
+  <li><a href="#leitura-seg-y-e-escrita-hdf5-incremental" id="toc-leitura-seg-y-e-escrita-hdf5-incremental" class="nav-link" data-scroll-target="#leitura-seg-y-e-escrita-hdf5-incremental"><span class="header-section-number">4.1</span> Leitura SEG-Y e Escrita HDF5 Incremental</a></li>
+  </ul></li>
+  <li><a href="#processamento-digital-de-sinais-dsp-e-paralelismo" id="toc-processamento-digital-de-sinais-dsp-e-paralelismo" class="nav-link" data-scroll-target="#processamento-digital-de-sinais-dsp-e-paralelismo"><span class="header-section-number">5</span> Processamento Digital de Sinais (DSP) e Paralelismo</a>
+  <ul class="collapse">
+  <li><a href="#importação-e-extração-de-geometria-selecionar-arquivo-seg-y" id="toc-importação-e-extração-de-geometria-selecionar-arquivo-seg-y" class="nav-link" data-scroll-target="#importação-e-extração-de-geometria-selecionar-arquivo-seg-y"><span class="header-section-number">5.1</span> 1. Importação e Extração de Geometria (Selecionar Arquivo SEG-Y)</a></li>
+  <li><a href="#parâmetros-do-filtro-butterworth-configurações-matemáticas" id="toc-parâmetros-do-filtro-butterworth-configurações-matemáticas" class="nav-link" data-scroll-target="#parâmetros-do-filtro-butterworth-configurações-matemáticas"><span class="header-section-number">5.2</span> 2. Parâmetros do Filtro Butterworth (Configurações Matemáticas)</a></li>
+  <li><a href="#fila-de-processamento-e-monitoramento-contínuo" id="toc-fila-de-processamento-e-monitoramento-contínuo" class="nav-link" data-scroll-target="#fila-de-processamento-e-monitoramento-contínuo"><span class="header-section-number">5.3</span> 3. Fila de Processamento e Monitoramento Contínuo</a></li>
+  </ul></li>
+  <li><a href="#camada-de-persistência-de-estado-metadados" id="toc-camada-de-persistência-de-estado-metadados" class="nav-link" data-scroll-target="#camada-de-persistência-de-estado-metadados"><span class="header-section-number">6</span> Camada de Persistência de Estado (Metadados)</a></li>
+  <li><a href="#itens-extras-implementados" id="toc-itens-extras-implementados" class="nav-link" data-scroll-target="#itens-extras-implementados"><span class="header-section-number">7</span> Itens Extras Implementados</a>
+  <ul class="collapse">
+  <li><a href="#paralelização-multi-core-de-traços" id="toc-paralelização-multi-core-de-traços" class="nav-link" data-scroll-target="#paralelização-multi-core-de-traços"><span class="header-section-number">7.1</span> 1. Paralelização Multi-Core de Traços</a></li>
+  <li><a href="#qualidade-de-controle-visual-qc" id="toc-qualidade-de-controle-visual-qc" class="nav-link" data-scroll-target="#qualidade-de-controle-visual-qc"><span class="header-section-number">7.2</span> 2. Qualidade de Controle Visual (QC)</a></li>
+  <li><a href="#log-de-execução-persistido-por-job" id="toc-log-de-execução-persistido-por-job" class="nav-link" data-scroll-target="#log-de-execução-persistido-por-job"><span class="header-section-number">7.3</span> 3. Log de Execução Persistido por Job</a></li>
+  <li><a href="#benchmark-streaming-vs-memory" id="toc-benchmark-streaming-vs-memory" class="nav-link" data-scroll-target="#benchmark-streaming-vs-memory"><span class="header-section-number">7.4</span> 4. Benchmark <em>Streaming vs Memory</em></a></li>
+  </ul></li>
+  <li><a href="#testes-de-software-e-integração" id="toc-testes-de-software-e-integração" class="nav-link" data-scroll-target="#testes-de-software-e-integração"><span class="header-section-number">8</span> Testes de Software e Integração</a>
+  <ul class="collapse">
+  <li><a href="#testes-unitários" id="toc-testes-unitários" class="nav-link" data-scroll-target="#testes-unitários"><span class="header-section-number">8.1</span> Testes Unitários</a></li>
+  <li><a href="#testes-de-ponta-a-ponta-end-to-end" id="toc-testes-de-ponta-a-ponta-end-to-end" class="nav-link" data-scroll-target="#testes-de-ponta-a-ponta-end-to-end"><span class="header-section-number">8.2</span> Testes de Ponta a Ponta (End-to-End)</a></li>
+  </ul></li>
+  <li><a href="#trilha-de-criatividade-e-escolhas-de-arquitetura" id="toc-trilha-de-criatividade-e-escolhas-de-arquitetura" class="nav-link" data-scroll-target="#trilha-de-criatividade-e-escolhas-de-arquitetura"><span class="header-section-number">9</span> Trilha de Criatividade e Escolhas de Arquitetura</a>
+  <ul class="collapse">
+  <li><a href="#opção-escolhida-retomada-de-um-job-interrompido-resume" id="toc-opção-escolhida-retomada-de-um-job-interrompido-resume" class="nav-link" data-scroll-target="#opção-escolhida-retomada-de-um-job-interrompido-resume"><span class="header-section-number">9.1</span> Opção Escolhida: Retomada de um Job Interrompido (<em>Resume</em>)</a></li>
+  <li><a href="#análise-das-alternativas-secundárias" id="toc-análise-das-alternativas-secundárias" class="nav-link" data-scroll-target="#análise-das-alternativas-secundárias"><span class="header-section-number">9.2</span> Análise das Alternativas Secundárias</a></li>
+  </ul></li>
+  <li><a href="#trabalhos-relacionados" id="toc-trabalhos-relacionados" class="nav-link" data-scroll-target="#trabalhos-relacionados"><span class="header-section-number">10</span> Trabalhos Relacionados</a></li>
+  <li><a href="#conclusão" id="toc-conclusão" class="nav-link" data-scroll-target="#conclusão"><span class="header-section-number">11</span> Conclusão</a></li>
+  <li><a href="#referências" id="toc-referências" class="nav-link" data-scroll-target="#referências"><span class="header-section-number">12</span> Referências</a></li>
+  </ul>
+</nav>
+</div>
+<main class="content column-page-left" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Relatório Técnico - Solução App Sísmica</h1>
+<p class="subtitle lead">Prova Técnica GIECAR UFF - Filtragem Passa-Baixa de Arquivos SEG-Y</p>
+</div>
+
+
+
+<div class="quarto-title-meta column-page-left">
+
+    <div>
+    <div class="quarto-title-meta-heading">Autor</div>
+    <div class="quarto-title-meta-contents">
+             <p>Rodrigo A. P. da Silva </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Data de Publicação</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">17 de setembro de 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="introdução" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Introdução</h1>
+<p>Este relatório descreve a arquitetura, as decisões de design e as soluções tecnológicas adotadas na construção do <strong>App Sísmica</strong>. O projeto foi concebido para modernizar o fluxo de pré-processamento sísmico, substituindo abordagens baseadas em scripts avulsos por uma aplicação desktop robusta, interativa e responsiva. O foco central da ferramenta é a aplicação eficiente de filtros passa-baixa em volumes massivos de dados no formato SEG-Y, garantindo tolerância a falhas e, sobretudo, impedindo a sobrecarga da memória RAM do sistema.</p>
+<p>Nas próximas seções, exploraremos detalhadamente as escolhas estruturais de desenvolvimento, o modelo de arquitetura adotado para desacoplar a interface das regras de negócio, a estratégia de processamento de dados por <em>streaming</em>, o comportamento da interface gráfica atrelada aos cálculos de sinal, e as camadas de persistência e testes. Ao final, discutiremos também as funcionalidades adicionais implementadas e as perspectivas de evolução da ferramenta.</p>
+</section>
+<section id="decisões-de-desenvolvimento" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> Decisões de Desenvolvimento</h1>
+<section id="uso-de-protocols-do-python-duck-typing-estático" class="level2" data-number="2.1">
+<h2 data-number="2.1" class="anchored" data-anchor-id="uso-de-protocols-do-python-duck-typing-estático"><span class="header-section-number">2.1</span> Uso de <em>Protocols</em> do Python (Duck Typing Estático)</h2>
+<p>Para garantir um alto nível de desacoplamento e aderência aos princípios do SOLID (especificamente o Princípio da Inversão de Dependência), a camada de negócio da aplicação utiliza a classe estrutural <code>Protocol</code> <span class="citation" data-cites="python_protocol">(<a href="#ref-python_protocol" role="doc-biblioref">PYTHON SOFTWARE FOUNDATION, 2024b</a>)</span> originária do módulo <code>typing</code>.</p>
+<p>Em vez de acoplar a Interface Gráfica ou os Workers a uma classe concreta de serviço, optou-se pela utilização de <em>Protocols</em>. Essa escolha traz a vantagem de permitir que diferentes implementações do serviço de filtragem (como versões otimizadas, mocks para testes ou conexões em nuvem) possam ser injetadas na aplicação sem que nenhuma herança explícita precise ser configurada por parte da implementação de destino, promovendo um <em>Duck Typing</em> tipado estaticamente.</p>
+<p>Um exemplo extraído do código evidencia essa decisão:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> typing <span class="im">import</span> Protocol, List</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> app_seismica.core.models <span class="im">import</span> Job, SeismicDataset</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> IFilterJobService(Protocol):</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="co">    Interface (Protocol) definindo o contrato exigido para o </span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="co">    serviço de jobs de filtragem.</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> create_filter_job(<span class="va">self</span>, dataset_id: <span class="bu">str</span>, cutoff_hz: <span class="bu">float</span>, </span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>                          order: <span class="bu">int</span>, n_workers: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>) <span class="op">-&gt;</span> Job:</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>        ...</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> list_jobs(<span class="va">self</span>, dataset_id: <span class="bu">str</span> <span class="op">=</span> <span class="va">None</span>, </span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>                  status: <span class="bu">str</span> <span class="op">=</span> <span class="va">None</span>) <span class="op">-&gt;</span> List[Job]:</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>        ...</span></code></pre></div><button title="Copiar para a área de transferência" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Na Interface Gráfica, a Janela Principal depende apenas dessa abstração, abstraindo detalhes sobre persistência ou infraestrutura:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> MainWindow(QMainWindow):</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    <span class="co"># A injeção aceita qualquer classe que satisfaça o contrato IFilterJobService</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, service: IFilterJobService): </span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>()</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.service <span class="op">=</span> service</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>        <span class="co"># ... resto do código UI</span></span></code></pre></div><button title="Copiar para a área de transferência" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="organização-de-diretórios-e-encapsulamento-de-módulos" class="level2" data-number="2.2">
+<h2 data-number="2.2" class="anchored" data-anchor-id="organização-de-diretórios-e-encapsulamento-de-módulos"><span class="header-section-number">2.2</span> Organização de Diretórios e Encapsulamento de Módulos</h2>
+<p>A estrutura de diretórios foi desenhada para separar claramente as responsabilidades da aplicação, seguindo o padrão moderno <code>src-layout</code> para projetos Python:</p>
+<pre class="text"><code>GIECAR-UFF-TESTE/
+├── data/
+│   ├── raw/           # Armazena os arquivos SEG-Y originais (inputs)
+│   ├── processed/     # Destino dos arquivos HDF5 resultantes da filtragem
+│   └── metadata.db    # Banco de dados SQLite persistindo o estado das aplicações
+├── src/
+│   └── app_seismica/
+│       ├── core/      # Modelos de domínio, entidades e regras de leitura base
+│       │   ├── models.py
+│       │   └── segy_reader.py
+│       ├── services/  # Regras de negócio e orquestração dos Jobs
+│       │   └── job_service.py
+│       ├── ui/        # Componentes visuais PyQt/PySide e workers de interface
+│       │   ├── worker.py
+│       │   ├── main_window.py
+│       │   └── __main__.py
+├── scripts/           # Scripts utilitários auxiliares (ex: visualização avulsa)
+│   └── plot_trace.py
+└── pyproject.toml     # Configuração de build, metadados e dependências</code></pre>
+<p>Um detalhe importante dessa arquitetura é a decisão de encapsular múltiplas classes e rotinas correlatas dentro de um mesmo arquivo lógico (por exemplo, agregar classes de modelo em <code>models.py</code> e componentes de <em>Job</em> no <code>job_service.py</code>).</p>
+<p>Diferente de convenções herdadas de linguagens como Java (onde vigora a regra rígida de “uma classe por arquivo”), a filosofia <em>Pythonic</em> encoraja a consolidação de abstrações intimamente ligadas em um mesmo <strong>Módulo</strong> para aumentar a coesão, facilitar a legibilidade e evitar uma fragmentação excessiva do sistema de arquivos <span class="citation" data-cites="python_modules">(<a href="#ref-python_modules" role="doc-biblioref">PYTHON SOFTWARE FOUNDATION, 2024a</a>)</span>. Isso simplificou drasticamente as importações e modernizou a base de código.</p>
+</section>
+<section id="modelagem-da-entidade-mínima-core-domain" class="level2" data-number="2.3">
+<h2 data-number="2.3" class="anchored" data-anchor-id="modelagem-da-entidade-mínima-core-domain"><span class="header-section-number">2.3</span> Modelagem da Entidade Mínima (Core Domain)</h2>
+<p>As instruções da prova delimitavam a existência de uma entidade mínima denominada <code>SeismicDataset</code> com um contrato rigoroso de campos <code>(id, name, sourcePath, nInlines, nCrosslines, nSamples, sampleRateMs, createdAt)</code>.</p>
+<p>Para modelar essa estrutura de forma limpa, estrita em tipagem e imutável (ideal para ser trafegada entre <em>threads</em> da UI sem causar <em>Race Conditions</em>), optou-se pela utilização do decorator nativo <code>@dataclass</code> do Python.</p>
+<p>Esta entidade encontra-se localizada no núcleo de domínio do software, especificamente no arquivo <code>src/app_seismica/core/models.py</code>. O encapsulamento permite que a entidade forneça propriedades calculadas cruciais (como a obtenção da Frequência de Nyquist diretamente de seu atributo de amostragem) garantindo o princípio <em>Tell, Don’t Ask</em>.</p>
+<p>Abaixo, o <em>snippet</em> representativo do arquivo:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dataclasses <span class="im">import</span> dataclass, field</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> datetime <span class="im">import</span> datetime, timezone</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pathlib <span class="im">import</span> Path</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="at">@dataclass</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> SeismicDataset:</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>    <span class="bu">id</span>: <span class="bu">str</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    name: <span class="bu">str</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    source_path: Path</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>    n_inlines: <span class="bu">int</span></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>    n_crosslines: <span class="bu">int</span></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>    n_samples: <span class="bu">int</span></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>    sample_rate_ms: <span class="bu">float</span></span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>    created_at: datetime <span class="op">=</span> field(</span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>        default_factory<span class="op">=</span><span class="kw">lambda</span>: datetime.now(timezone.utc)</span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">@property</span></span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> total_traces(<span class="va">self</span>) <span class="op">-&gt;</span> <span class="bu">int</span>:</span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="va">self</span>.n_inlines <span class="op">*</span> <span class="va">self</span>.n_crosslines</span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>    <span class="at">@property</span></span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> nyquist_frequency_hz(<span class="va">self</span>) <span class="op">-&gt;</span> <span class="bu">float</span>:</span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>        <span class="co"># dt em segundos = sample_rate_ms / 1000.0</span></span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a>        dt_sec <span class="op">=</span> <span class="va">self</span>.sample_rate_ms <span class="op">/</span> <span class="fl">1000.0</span></span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="fl">1.0</span> <span class="op">/</span> (<span class="fl">2.0</span> <span class="op">*</span> dt_sec)</span></code></pre></div><button title="Copiar para a área de transferência" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</section>
+<section id="arquitetura-e-interface" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Arquitetura e Interface</h1>
+<section id="contratos-da-camada-de-negócio-e-validações-rígidas" class="level2" data-number="3.1">
+<h2 data-number="3.1" class="anchored" data-anchor-id="contratos-da-camada-de-negócio-e-validações-rígidas"><span class="header-section-number">3.1</span> Contratos da Camada de Negócio e Validações Rígidas</h2>
+<p>As especificações do projeto exigiam uma camada de negócio estritamente desacoplada da Interface Gráfica, com contratos bem estabelecidos que pudessem ser consumidos por qualquer <em>client</em> (seja a UI PyQt, seja uma suite de testes automatizados).</p>
+<p>O contrato mínimo, formalizado através da classe <code>FilterJobServiceProtocol</code> (localizado em <code>src/app_seismica/services/interfaces.py</code>), define as seguintes obrigações:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> typing <span class="im">import</span> Protocol, List, Optional, Callable</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> threading</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> app_seismica.core.models <span class="im">import</span> Job, JobStatus</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>ProgressCallback <span class="op">=</span> Callable[[<span class="bu">float</span>], <span class="va">None</span>]</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> FilterJobServiceProtocol(Protocol):</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> create_filter_job(</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>, dataset_id: <span class="bu">str</span>, cutoff_hz: <span class="bu">float</span>, order: <span class="bu">int</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>    ) <span class="op">-&gt;</span> Job:</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>        ...</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> run_filter_job(</span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>, job_id: <span class="bu">str</span>, </span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>        progress_callback: Optional[ProgressCallback] <span class="op">=</span> <span class="va">None</span>, </span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>        cancel_token: Optional[threading.Event] <span class="op">=</span> <span class="va">None</span></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>    ) <span class="op">-&gt;</span> <span class="va">None</span>:</span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>        ...</span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> cancel_job(<span class="va">self</span>, job_id: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">bool</span>:</span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>        ...</span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> get_job_status(<span class="va">self</span>, job_id: <span class="bu">str</span>) <span class="op">-&gt;</span> Job:</span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>        ...</span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> list_jobs(</span>
+<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>, dataset_id: Optional[<span class="bu">str</span>] <span class="op">=</span> <span class="va">None</span>, </span>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a>        status: Optional[JobStatus] <span class="op">=</span> <span class="va">None</span></span>
+<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a>    ) <span class="op">-&gt;</span> List[Job]:</span>
+<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a>        ...</span></code></pre></div><button title="Copiar para a área de transferência" class="code-copy-button"><i class="bi"></i></button></div>
+<section id="regras-de-validação-no-create_filter_job" class="level3" data-number="3.1.1">
+<h3 data-number="3.1.1" class="anchored" data-anchor-id="regras-de-validação-no-create_filter_job"><span class="header-section-number">3.1.1</span> Regras de Validação no <code>create_filter_job</code></h3>
+<p>A fim de assegurar a robustez matemática e prevenir execuções de trabalhos computacionalmente caros que inevitavelmente falhariam ou gerariam dados inconsistentes, foram impostas validações estritas no momento da criação do <em>Job</em>:</p>
+<ol type="1">
+<li><strong>Validação de Nyquist:</strong> A frequência de corte (<code>cutoff_hz</code>) não pode ser maior ou igual à frequência de Nyquist (frequência limite amostral calculada através do passo de amostragem sísmico). Caso contrário, a filtragem resultaria em efeitos destrutivos irreversíveis (como <em>aliasing</em> de energia). A regra matemática imposta avalia que o valor deve estar no intervalo <span class="math inline">\(0 &lt; \text{cutoff\_hz} &lt; \text{Nyquist}\)</span>.</li>
+<li><strong>Positividade Estrita:</strong> Frequências de corte com valores neutros (<span class="math inline">\(0\)</span> Hz) ou negativos bloqueiam a criação do <em>Job</em>, sendo semanticamente impossíveis num filtro analógico/digital.</li>
+<li><strong>Fronteiras da Ordem (Roll-off) e Efeito <em>Ringing</em>:</strong> A ordem do filtro define a agressividade do corte. Em filtros Butterworth, cada grau de ordem adiciona uma queda de atenuação de <span class="math inline">\(6\text{ dB/oitava}\)</span> (ou <span class="math inline">\(20\text{ dB/década}\)</span>) <span class="citation" data-cites="butterworth_wiki analog_devices_filters">(<a href="#ref-analog_devices_filters" role="doc-biblioref">ANALOG DEVICES, 2024</a>, <a href="#ref-butterworth_wiki" role="doc-biblioref">WIKIPEDIA CONTRIBUTORS, 2024</a>)</span>. Um filtro de ordem 1 tem uma queda suave (inútil na sísmica), enquanto um filtro de ordem 8 despenca acentuadamente a <span class="math inline">\(48\text{ dB/oitava}\)</span>. A aplicação permite escolher ordens de 1 até 12, pois 12 é o limite onde a biblioteca SciPy consegue calcular os coeficientes com segurança em <code>float32</code>. Contudo, recomenda-se ao usuário (através da UI) operar entre as ordens 2 e 8. Ultrapassar a ordem 8 para forçar uma transição bruta de corte causa distorções no domínio do tempo conhecidas como <em>Ringing</em> (ou Fenômeno de Gibbs). Na sísmica, o <em>ringing</em> é catastrófico, pois as oscilações espúrias provocadas pelo sobressinal geram “fantasmas” que o geofísico pode interpretar erroneamente como reflexões reais de camadas de rocha <span class="citation" data-cites="ringing_effect_paper">(<a href="#ref-ringing_effect_paper" role="doc-biblioref"><span class="nocase">LI, WANG, <em>et al.</em></span>, 2026</a>)</span>.</li>
+<li><strong>Coerência de Relação (Dataset Existente):</strong> O orquestrador valida se o <code>dataset_id</code> injetado como referência de entrada corresponde a uma entidade previamente cadastrada no sistema.</li>
+</ol>
+<p>Essas validações acontecem instantaneamente no <em>Core</em> (via encapsulamento, centralizado na camada <code>FilterParameters</code>), resultando na elevação imediata de um erro do tipo <code>ValueError</code> tratado preventivamente pela Interface antes de entrar na fila.</p>
+</section>
+</section>
+<section id="framework-base-e-responsividade" class="level2" data-number="3.2">
+<h2 data-number="3.2" class="anchored" data-anchor-id="framework-base-e-responsividade"><span class="header-section-number">3.2</span> Framework Base e Responsividade</h2>
+<p>A aplicação desktop foi construída utilizando o <strong>PySide6</strong> (o binding oficial mais moderno do Qt para Python, substituto natural do PyQt5 recomendado para projetos novos). Para garantir que a interface não congele durante o processamento de horas de um dado sísmico, a arquitetura adotou um modelo assíncrono estrito: - <strong>UI Thread (Main Thread):</strong> Responsável exclusivamente por capturar as ações do usuário e renderizar a tela. - <strong>QRunnable / QThreadPool:</strong> Utilizados para encapsular a lógica de execução dos <em>Jobs</em> de filtragem. Dessa forma, a interface permanece totalmente responsiva (podendo ser arrastada ou clicada) enquanto os traços estão sendo processados em plano de fundo.</p>
+<p>A comunicação entre a <em>thread</em> de processamento e a interface gráfica ocorre através do sistema padrão de <strong>Signals and Slots</strong> do Qt, permitindo atualizações de barras de progresso e status de forma segura e não bloqueante.</p>
+</section>
+</section>
+<section id="gerenciamento-de-memória-e-processamento-de-dados-streaming" class="level1" data-number="4">
+<h1 data-number="4"><span class="header-section-number">4</span> Gerenciamento de Memória e Processamento de Dados (Streaming)</h1>
+<p>Um dos requisitos cruciais do projeto era a proibição do carregamento completo do volume sísmico em memória (o que geraria exceções <em>Out Of Memory</em> em dados acima de 25GB). Para resolver isso, adotou-se o modelo de processamento por <strong>Streaming em Lotes (Chunks)</strong>.</p>
+<section id="leitura-seg-y-e-escrita-hdf5-incremental" class="level2" data-number="4.1">
+<h2 data-number="4.1" class="anchored" data-anchor-id="leitura-seg-y-e-escrita-hdf5-incremental"><span class="header-section-number">4.1</span> Leitura SEG-Y e Escrita HDF5 Incremental</h2>
+<p>A biblioteca <strong><code>segyio</code></strong> foi utilizada para a extração direta dos parâmetros do cabeçalho de volume, possibilitando identificar a Frequência de Nyquist do dado.</p>
+<p>Durante a filtragem, a operação de leitura e persistência foi estritamente projetada para lidar com restrições de memória de forma eficiente, funcionando da seguinte forma (conforme implementado em <code>job_service.py</code>): 1. <strong>Leitura por Lotes:</strong> O arquivo SEG-Y é aberto com <code>segyio.open(..., ignore_geometry=True)</code>. A leitura é iterativa, carregando apenas uma quantidade máxima de traços definida por <code>chunk_size</code> (ex: 500) usando <em>list comprehension</em> na forma <code>[sgy.trace[i] for i in range(start_idx, end_idx)]</code>. Isso evita carregar integralmente o arquivo (<code>sgy.trace.raw[:]</code>). 2. <strong>Processamento Independente:</strong> O filtro <code>scipy.signal.sosfiltfilt</code> (ou <code>sosfilt</code>) atua exclusivamente sob o array contendo o <em>chunk</em> parcial ao longo de seu eixo. 3. <strong>Escrita Incremental (HDF5):</strong> O array filtrado é salvo diretamente num <em>dataset</em> HDF5 pré-alocado (criado com a flag <code>chunks=(chunk_size, n_samples)</code>), inserindo o dado de maneira fatiada (<code>dset[start_idx:end_idx, :] = filtered_chunk</code>).</p>
+<p>Desta forma, o consumo máximo (pico de memória) se limita estritamente à matriz do <em>chunk</em> simultâneo, mantendo complexidade temporal linear mas <strong>complexidade espacial independente <span class="math inline">\(O(\text{chunk\_size} \times \text{n\_samples})\)</span></strong>. A solução lida sem nenhum problema com arquivos na casa de dezenas de Gigabytes. O ganho provindo dessa abordagem foi validado empiricamente e comprovado na tabela de benchmark incluída no <code>README.md</code>.</p>
+</section>
+</section>
+<section id="processamento-digital-de-sinais-dsp-e-paralelismo" class="level1" data-number="5">
+<h1 data-number="5"><span class="header-section-number">5</span> Processamento Digital de Sinais (DSP) e Paralelismo</h1>
+<p>A lógica central da aplicação reside na sua capacidade de atuar como uma verdadeira ferramenta de <em>Processamento Digital de Sinais</em> (DSP) para geofísica, permitindo ajustes dinâmicos, validações matemáticas estruturadas e alta performance via concorrência. Todo esse núcleo analítico é orquestrado através da interface gráfica desenhada para guiar e proteger a intuição do Geofísico.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="ui_screenshot.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption>Interface Principal do App Sísmica - Seções e Campos Configuráveis</figcaption>
+</figure>
+</div>
+<p>Para um entendimento completo, a interface e sua amarração com o motor de DSP foram divididas nas seguintes frentes:</p>
+<section id="importação-e-extração-de-geometria-selecionar-arquivo-seg-y" class="level2" data-number="5.1">
+<h2 data-number="5.1" class="anchored" data-anchor-id="importação-e-extração-de-geometria-selecionar-arquivo-seg-y"><span class="header-section-number">5.1</span> 1. Importação e Extração de Geometria (Selecionar Arquivo SEG-Y)</h2>
+<p>Ao importar o arquivo (neste exemplo, <code>volve_psdm_full_time.segy</code>), o sistema usa a biblioteca <strong><code>segyio</code></strong> para mapear os cabeçalhos em uma fração de segundos. A UI exibe sumariamente: - <strong>Amostragem (dt):</strong> O intervalo entre as leituras do sinal (ex: <span class="math inline">\(4.0\text{ ms}\)</span>). - <strong>Frequência de Nyquist:</strong> Calculada automaticamente como <span class="math inline">\(\frac{1}{2 \times dt}\)</span> (ex: <span class="math inline">\(125.0\text{ Hz}\)</span>). Essa métrica é a espinha dorsal de validação do filtro. - <strong>Dimensões do Arquivo:</strong> Mostra a quantidade monstruosa de dados a ser batida (<em>ex: 288.694 traços com 850 amostras cada</em>), justificando a obrigatoriedade da abordagem <em>streaming</em>.</p>
+</section>
+<section id="parâmetros-do-filtro-butterworth-configurações-matemáticas" class="level2" data-number="5.2">
+<h2 data-number="5.2" class="anchored" data-anchor-id="parâmetros-do-filtro-butterworth-configurações-matemáticas"><span class="header-section-number">5.2</span> 2. Parâmetros do Filtro Butterworth (Configurações Matemáticas)</h2>
+<p>Nesta seção da interface, o usuário injeta a métrica do filtro. Os componentes foram interligados ao sistema de defesa matemático:</p>
+<ul>
+<li><strong>Frequência de Corte (Hz) e Ordem do Filtro:</strong> Estes <em>spinboxes</em> coletam os parâmetros centrais do <em>Butterworth</em> originário do <code>scipy.signal.butter</code>. Como amplamente discutido na seção de “Regras de Validação”, a interface proíbe a inserção de cortes maiores que o Nyquist e utiliza uma indicação visual preventiva (sugerindo ordens de 2 a 8) para resguardar o geofísico contra o indesejado fenômeno de <em>Ringing</em> nas respostas sísmicas, ainda que seja possível forçar ordens até 12.</li>
+<li><strong>Número de Processos (Workers):</strong> Considerando a natureza CPU-bound da filtragem <code>sosfilt</code>, esta <em>spinbox</em> determina a quantidade máxima de núcleos <span class="math inline">\(W\)</span> que o <code>ProcessPoolExecutor</code> pode recrutar, descarregando porções de traços para diferentes <em>cores</em> de forma a driblar o GIL do Python e encurtar horas de processamento para alguns minutos.</li>
+<li><strong>Tamanho do Lote (Chunk Size):</strong> Fundamental para o <strong>Gerenciamento Streaming</strong>. Determina quantos traços o sistema processará de uma só vez antes de fazer <em>commit</em> incremental para o arquivo HDF5 e limpar o lixo da memória.</li>
+</ul>
+</section>
+<section id="fila-de-processamento-e-monitoramento-contínuo" class="level2" data-number="5.3">
+<h2 data-number="5.3" class="anchored" data-anchor-id="fila-de-processamento-e-monitoramento-contínuo"><span class="header-section-number">5.3</span> 3. Fila de Processamento e Monitoramento Contínuo</h2>
+<p>Como demonstrado na imagem (com três barras laranjas processadas), a UI utiliza uma <strong>Fila de Jobs Assíncrona</strong> atrelada a uma <em>ScrollArea</em> e gerenciada pela <code>QThreadPool</code>. - <strong>Interação:</strong> O usuário pode “Adicionar à Fila” múltiplos processamentos sucessivos. Eles são despachados num paradigma produtor/consumidor não bloqueante. - <strong>Controles (Visualizar, Pausar, Cancelar):</strong> Cada cartão (<em>Job Card</em>) recebe sinais via <code>ProgressCallback</code>. Se o botão “Cancelar” for ativado, a Thread escuta a interrupção da <em>flag</em> cooperativamente. - <strong>Telemetria de Estado (Barra de Status Inferior):</strong> Um timer coleta os recursos do <em>daemon</em> rodando (via <code>psutil</code>) demonstrando que, independentemente de um trabalho pesado, o <strong>Pico Histórico de RAM</strong> permanece constante, concretizando o consumo espacial prometido de apenas <span class="math inline">\(O(\text{chunk\_size} \times \text{n\_samples})\)</span>.</p>
+</section>
+</section>
+<section id="camada-de-persistência-de-estado-metadados" class="level1" data-number="6">
+<h1 data-number="6"><span class="header-section-number">6</span> Camada de Persistência de Estado (Metadados)</h1>
+<p>A modelagem estruturada do histórico e status foi realizada por meio do <strong>SQLAlchemy (ORM)</strong> sobre um banco de dados <strong>SQLite</strong> (um arquivo <code>.db</code> gravado na pasta <code>data/</code>).</p>
+<p>Esta persistência garante as seguintes propriedades: - Isolamento das entidades: <code>SeismicDataset</code> (metadados do volume de origem) e <code>Job</code> (parâmetros de estado de uma filtragem). - <strong>Recuperação de Estado:</strong> Caso o programa seja encerrado ou caia por falhas do Sistema Operacional, a engine percebe a discrepância dos status marcados artificialmente como “RUNNING” e converte-os cooperativamente como falha (<code>FAILED</code>) no próximo boot, gerando log avisando sobre o desligamento prematuro do software.</p>
+</section>
+<section id="itens-extras-implementados" class="level1" data-number="7">
+<h1 data-number="7"><span class="header-section-number">7</span> Itens Extras Implementados</h1>
+<p>Para demonstrar proficiência além dos requisitos centrais estritos da arquitetura e da prova, este projeto desenvolveu a fundo os tópicos opcionais a seguir:</p>
+<section id="paralelização-multi-core-de-traços" class="level2" data-number="7.1">
+<h2 data-number="7.1" class="anchored" data-anchor-id="paralelização-multi-core-de-traços"><span class="header-section-number">7.1</span> 1. Paralelização Multi-Core de Traços</h2>
+<p>Através do emprego do <code>ProcessPoolExecutor</code>, a filtragem matemática sobre os arrays foge das travas globais do interpretador Python (GIL), executando a bateria de processamento numérico de forma concorrente em todos os núcleos lógicos disponibilizados pelo usuário, transformando processamentos de horas para janelas de minutos.</p>
+</section>
+<section id="qualidade-de-controle-visual-qc" class="level2" data-number="7.2">
+<h2 data-number="7.2" class="anchored" data-anchor-id="qualidade-de-controle-visual-qc"><span class="header-section-number">7.2</span> 2. Qualidade de Controle Visual (QC)</h2>
+<p>A construção e acoplamento de uma interface interativa adicional de Controle de Qualidade (<code>TraceViewerDialog</code>) utilizando o ecossistema gráfico do <code>Matplotlib</code> embutido nativamente como widget PyQt6/PySide6.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="ui_trace_viewer.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption>Ferramenta de Controle de Qualidade (QC) sobreposta aos dados</figcaption>
+</figure>
+</div>
+<p>Conforme observado, essa interface oferece ao geofísico uma ferramenta prática para inspeção traço a traço. Ela possibilita a comparação visual direta entre o sinal do arquivo SEG-Y bruto e o resultado filtrado contido no banco de dados HDF5. Para garantir uma análise ergonômica, a tela disponibiliza controles de navegabilidade granulares:</p>
+<ul>
+<li><strong>Botões <code>&lt;</code> e <code>&gt;</code>:</strong> Avançam ou retrocedem o gráfico exatamente em 1 traço por clique (passo unitário).</li>
+<li><strong>Botões <code>&lt;&lt;</code> e <code>&gt;&gt;</code>:</strong> Realizam saltos maiores, permitindo navegar rapidamente pelo volume sísmico avançando ou retrocedendo blocos de traços de uma só vez.</li>
+<li><strong>Campo de Texto Central (<code>trace_id</code>):</strong> Permite que o usuário digite o ID numérico exato do traço que deseja analisar. Ao confirmar, o gráfico é atualizado imediatamente para a posição solicitada, eliminando a necessidade de varredura manual.</li>
+</ul>
+<p>Essa funcionalidade tem o objetivo direto de validar o trabalho (<em>QC - Quality Control</em>), garantindo visualmente que as altas frequências foram atenuadas com sucesso sem que a assinatura original do sinal se perdesse no processo.</p>
+</section>
+<section id="log-de-execução-persistido-por-job" class="level2" data-number="7.3">
+<h2 data-number="7.3" class="anchored" data-anchor-id="log-de-execução-persistido-por-job"><span class="header-section-number">7.3</span> 3. Log de Execução Persistido por Job</h2>
+<p>Para além das migrações do banco SQLite, idealizou-se e implementou-se a gravação paralela de telemetria em formato texto em disco, sob a hierarquia de pastas <code>data/logs/jobs/</code>. Cada processo acionado recebe um logger virtual nomeado com a UUID exclusiva daquele <em>job</em>. Essa técnica de separação é mandatória para orquestrações de nuvem e <em>tracing</em> de erros de produção.</p>
+<p>Abaixo é possível checar o fragmento extraído na prática do arquivo <code>&lt;job_id&gt;.log</code> persistido após uma filtragem:</p>
+<pre class="text"><code>2026-09-17 11:21:03,115 - INFO - [Job ba7c1-42e] Transição para status RUNNING.
+2026-09-17 11:21:03,116 - INFO - Iniciando Job ba7c1-42e
+2026-09-17 11:21:03,116 - INFO - Parâmetros: Dataset='volve_psdm', Frequência de Corte=45.0Hz, Ordem=4, Workers=4, Chunk Size=500
+2026-09-17 11:21:08,310 - INFO - Sucesso: 288694 traços processados.
+2026-09-17 11:21:08,317 - INFO - Job concluído com sucesso. Tempo total: 5.2s. Output: .../processed/8/volve_psdm_filtered.h5</code></pre>
+<p>Essa auditoria em tempo real, independente do banco de dados, provê o detalhamento exato em caso de auditorias e deburações sistêmicas (inclusive alertando se o job faliu devido à queda abrupta de energia da máquina).</p>
+</section>
+<section id="benchmark-streaming-vs-memory" class="level2" data-number="7.4">
+<h2 data-number="7.4" class="anchored" data-anchor-id="benchmark-streaming-vs-memory"><span class="header-section-number">7.4</span> 4. Benchmark <em>Streaming vs Memory</em></h2>
+<p>A aplicação foi projetada de forma inteligente para não carregar arquivos gigantescos inteiros na memória RAM, utilizando a métrica configurável de <em>Chunk Size</em>.</p>
+<p>Para demonstrar a eficácia desse controle, realizamos um <em>benchmark</em> filtrando o arquivo <code>volve_psdm_full_time.segy</code> em diferentes tamanhos de lote. Conforme pode ser revisto na Imagem da Interface Principal (no final da Seção 5), o rodapé da aplicação implementa uma barra de <em>status</em> amparada na biblioteca <code>psutil</code>, que monitora o processo nativo do sistema operacional e registra em tempo real o <strong>Pico Histórico</strong> de memória RAM alocada pelo software. Foi utilizando exclusivamente a telemetria desta ferramenta visual que os seguintes dados foram aferidos e validados:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th style="text-align: center;">Tamanho do Lote (Chunk Size)</th>
+<th style="text-align: center;">Pico de Memória RAM (MB)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;"><strong>500</strong></td>
+<td style="text-align: center;">360.0 MB</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;"><strong>5.000</strong></td>
+<td style="text-align: center;">585.0 MB</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;"><strong>50.000</strong></td>
+<td style="text-align: center;">1.857.2 MB</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;"><strong>288.694</strong> <em>(Arquivo Inteiro)</em></td>
+<td style="text-align: center;">6.918.9 MB</td>
+</tr>
+</tbody>
+</table>
+<p>Os dados revelam explicitamente como a arquitetura desenvolvida consome os <em>bytes</em> do Sistema Operacional: o escalonamento é proporcional, garantindo que o programa evite explosões e limites fixos de <em>hardware</em> (<em>Out of Memory</em>), rodando até mesmo em notebooks restritos.</p>
+</section>
+</section>
+<section id="testes-de-software-e-integração" class="level1" data-number="8">
+<h1 data-number="8"><span class="header-section-number">8</span> Testes de Software e Integração</h1>
+<p>O ecossistema conta com validações intensas via <strong><code>pytest</code></strong>, cobrindo o comportamento da camada de negócio e regras intrínsecas ao Domínio Físico. A suite de testes foi desenhada utilizando <em>fixtures</em> isoladas do banco de dados (SQLite em memória), garantindo que os testes não poluam o banco real. O projeto executa exatamente <strong>6 testes</strong> automatizados, divididos nos seguintes escopos:</p>
+<section id="testes-unitários" class="level2" data-number="8.1">
+<h2 data-number="8.1" class="anchored" data-anchor-id="testes-unitários"><span class="header-section-number">8.1</span> Testes Unitários</h2>
+<p>Estes testes validam componentes isolados da arquitetura, especialmente a matemática digital e a integridade da máquina de estado do serviço:</p>
+<ol type="1">
+<li><strong><code>test_butterworth_filter_correctness</code></strong>: Focado estritamente no Processamento Digital de Sinais (DSP). Este teste utiliza NumPy para gerar um sinal sintético sujo com a soma de duas ondas: uma de baixa frequência (10 Hz) e uma de alta frequência (100 Hz). O teste invoca o filtro passa-baixa e, logo depois, aplica a Transformada Rápida de Fourier (<code>np.fft</code>) para validar matematicamente as energias. O teste só passa se a onda de 10 Hz for preservada (erro mínimo) e a de 100 Hz for esmagada severamente.</li>
+<li><strong><code>test_job_creation_and_validation</code></strong>: Valida a inserção nominal de um <em>Job</em> no sistema. Registra um <em>dataset</em> em memória, cria o trabalho e verifica se o objeto instanciado possui o status inicial absoluto de <code>CREATED</code> e se os parâmetros imputados foram devolvidos fielmente na consulta.</li>
+<li><strong><code>test_job_validation_against_nyquist</code></strong>: Garante a segurança matemática. Registra um volume sísmico com frequência de Nyquist em 125 Hz e tenta agendar um filtro com corte em 130 Hz. O <em>framework</em> captura se o orquestrador devolve a exceção fatal apropriada protegendo o processamento.</li>
+<li><strong><code>test_job_validation_invalid_cutoff_and_order</code></strong>: Protege contra limites estritos físicos e matemáticos. Executa sub-testes para injetar frequências de cortes impossíveis (negativas ou zeradas) e forçar a criação de ordens de atenuação proibidas para garantir que o sistema rejeite ativamente esses parâmetros.</li>
+<li><strong><code>test_job_cancellation_state</code></strong>: Testa as quebras do fluxo cooperativo. Agiliza a criação de um <em>Job</em> e simula um envio de cancelamento assíncrono. Na sequência, recupera o banco de dados em memória para asseverar que as flags transitórias evoluíram e cravaram o status final e imutável para <code>CANCELLED</code>.</li>
+</ol>
+</section>
+<section id="testes-de-ponta-a-ponta-end-to-end" class="level2" data-number="8.2">
+<h2 data-number="8.2" class="anchored" data-anchor-id="testes-de-ponta-a-ponta-end-to-end"><span class="header-section-number">8.2</span> Testes de Ponta a Ponta (End-to-End)</h2>
+<p>Estes testes assumem que a aplicação está rodando integralmente (exceto a Interface Gráfica), acoplando Leitura de Arquivo, Banco de Dados, Filtros de Domínio e Escrita.</p>
+<ol start="6" type="1">
+<li><strong><code>test_full_pipeline_e2e</code></strong>: Testa o simulacro integral das ações de um Geofísico.
+<ul>
+<li>O teste inicia utilizando a biblioteca <code>segyio</code> para fabricar um miniarquivo <code>.sgy</code> estruturalmente válido, injetando cabeçalhos <em>Inlines</em> e <em>Crosslines</em> reais, gravando o traço sísmico falso num diretório temporário do SO provido pelo <code>pytest</code>.</li>
+<li>O sistema então registra esse falso <em>dataset</em>, cria um <em>job</em> formal e aciona a cadeia paralela de trabalhadores para fatiar, filtrar e redigir o HDF5 resultante incrementalmente.</li>
+<li>Por fim, além de atestar que a máquina de estados terminou como <code>COMPLETED</code> chegando em <span class="math inline">\(100\%\)</span>, o teste abre o artefato final com a <code>h5py</code> e valida estritamente seu formato, <em>shape</em> e garante que a energia das marolas refletidas não está vazia.</li>
+</ul></li>
+</ol>
+</section>
+</section>
+<section id="trilha-de-criatividade-e-escolhas-de-arquitetura" class="level1" data-number="9">
+<h1 data-number="9"><span class="header-section-number">9</span> Trilha de Criatividade e Escolhas de Arquitetura</h1>
+<p>O descritivo do desafio apresentou três opções opcionais focadas na análise de “Criatividade”. A intenção deste tópico foi testar a visão de longo prazo do candidato sobre o produto. Como o objetivo principal dessa etapa é instigar o questionamento crítico, <strong>nenhuma implementação adicional no código foi realizada</strong>, sendo seu propósito o de pautar as razões pelas quais priorizaríamos o desenvolvimento funcional e estratégico.</p>
+<section id="opção-escolhida-retomada-de-um-job-interrompido-resume" class="level2" data-number="9.1">
+<h2 data-number="9.1" class="anchored" data-anchor-id="opção-escolhida-retomada-de-um-job-interrompido-resume"><span class="header-section-number">9.1</span> Opção Escolhida: Retomada de um Job Interrompido (<em>Resume</em>)</h2>
+<p>A decisão de arquitetura mais prioritária a se integrar na ferramenta seria a <strong>Retomada de um Job interrompido a partir do último chunk processado com sucesso</strong>. Essa escolha foca intrinsecamente na resiliência do sistema e na experiência do Geofísico. Visto que os volumes de dados de entrada na indústria são colossalmente pesados (frequentemente dezenas ou centenas de Gigabytes), um processamento sísmico de alta ordem em lote pode levar horas. Caso houvesse um <em>crash</em> na máquina ou falta de energia com o processo em 98%, obrigar o usuário a refazer horas de computação seria extremamente custoso para o calendário do projeto. Com a arquitetura atual gravando HDF5 em <em>chunks</em>, rastrear o ponteiro final (último traço salvo) no banco SQLite e reiniciar a leitura seletiva a partir desse deslocamento seria um próximo passo natural e maduro da aplicação.</p>
+</section>
+<section id="análise-das-alternativas-secundárias" class="level2" data-number="9.2">
+<h2 data-number="9.2" class="anchored" data-anchor-id="análise-das-alternativas-secundárias"><span class="header-section-number">9.2</span> Análise das Alternativas Secundárias</h2>
+<ol type="1">
+<li><p><strong>Limitar intervalos de inline/xline para cálculo:</strong> Embora pareça útil permitir fatiamentos visuais ou limitados na leitura, essa feature pode ser considerada redudante no escopo <em>core</em> do filtro. No dia a dia, caso o Geofísico queira processar apenas uma fatia específica, ferramentas dedicadas (como o próprio <code>segyio</code> via terminal, SU ou módulos <em>crop</em> de softwares comerciais) podem realizar o corte rápido gerando um arquivo menor. A responsabilidade primária desta aplicação é a matemática do filtro, sem necessidade de superpovoá-la com edições de geometria volumétrica.</p></li>
+<li><p><strong>Exportar Relatório (PDF/CSV) e Contratos de Integração:</strong> A possibilidade de exportar logs e parâmetros é excelente sob a ótica gerencial (relatórios executivos automáticos documentando as premissas tomadas no dado). Mais criticamente, raramente um filtro passa-baixa atua isolado; ele faz parte de um encadeamento (<em>workflow</em>) complexo de processamento sísmico. Logo, a capacidade de gerar um artefato (seja em JSON, CSV ou API) determinando o contrato absoluto do processamento realizado é de vital importância para permitir que este nó (Filtro) injete sua saída (HDF5 limpo + Metadados) eficientemente na entrada do software responsável pelo próximo estágio da cadeia geofísica.</p></li>
+</ol>
+</section>
+</section>
+<section id="trabalhos-relacionados" class="level1" data-number="10">
+<h1 data-number="10"><span class="header-section-number">10</span> Trabalhos Relacionados</h1>
+<p>A construção desta solução para o processamento de dados sísmicos não parte de um vácuo acadêmico, mas apoia-se em conhecimentos prévios e publicações focadas exatamente em extrair o máximo desempenho computacional de algoritmos geofísicos intensivos. Abaixo destacam-se três trabalhos de base do autor que fundamentam as escolhas de paralelismo, eficiência e controle de recursos (como a memória) implementadas no <strong>App Sísmica</strong>.</p>
+<p>No artigo <em>“Accelerating Pre-stack Kirchhoff Time Migration by Manual Vectorization”</em> <span class="citation" data-cites="alves2017accelerating">(<a href="#ref-alves2017accelerating" role="doc-biblioref">ALVES, PESTANA, <em>et al.</em>, 2017</a>)</span>, o foco primário foi investigar como otimizar agressivamente o código computacional da Migração Kirchhoff Pré-empilhamento em Tempo (PKTM) — um algoritmo clássico e extremamente custoso na geofísica. Os resultados mostraram que o uso de instruções SIMD (<em>Single Instruction, Multiple Data</em>) via vetorização manual superava as otimizações automáticas de compiladores comerciais. Esse conhecimento se reflete diretamente na nossa escolha de utilizar o <code>scipy.signal.sosfilt</code> no App Sísmica, delegando o processamento pesado do filtro para camadas implementadas de forma vetorizada e altamente otimizada em C por debaixo dos panos do Python, garantindo eficiência máxima por núcleo de CPU.</p>
+<p>Na mesma linha estrutural, o estudo <em>“Vetorização e Análise de Algoritmos Paralelos para a Migração Kirchhoff Pré-empilhamento em Tempo”</em> <span class="citation" data-cites="silva2017vetorizacao">(<a href="#ref-silva2017vetorizacao" role="doc-biblioref">SILVA, ALVES, <em>et al.</em>, 2017</a>)</span> mergulhou no comportamento de paralelismo acoplado. O artigo prova empiricamente o ganho provindo da distribuição da carga de processamento do PKTM sobre arquiteturas de memória compartilhada. Da mesma forma, o App Sísmica não joga a responsabilidade de filtrar gigabytes de dados sobre uma única <em>thread</em>; ele mimetiza essa abordagem paralela usando o <code>ProcessPoolExecutor</code>, fatiando os <em>chunks</em> através dos diversos núcleos (Workers) da máquina local para acelerar criticamente o fluxo.</p>
+<p>Por fim, o trabalho <em>“Analysis of Parallel and Vectorized Algorithms of Pre-Stack Kirchhoff Time Migration in Virtual Environments”</em> <span class="citation" data-cites="silva2018analysis">(<a href="#ref-silva2018analysis" role="doc-biblioref">SILVA, ALVES, <em>et al.</em>, 2018</a>)</span> tratou do desafio de executar processamento sísmico intenso sobre contêineres e máquinas virtuais, locais sujeitos à instabilidade e tetos de limite de recursos de computação na nuvem (IaaS). O rigor imposto nesse trabalho no trato e medição dos recursos subjacentes é exatamente a filosofia do gerenciamento de memória em <em>streaming</em> por blocos (Chunks) construído nesta avaliação, que garante um limite estrito e constante de RAM (complexidade espacial <span class="math inline">\(O(\text{chunk\_size} \times \text{n\_samples})\)</span>), inviabilizando gargalos de <em>Out of Memory</em> mesmo se a aplicação estiver executando em nós limitados de um cluster em nuvem.</p>
+</section>
+<section id="conclusão" class="level1" data-number="11">
+<h1 data-number="11"><span class="header-section-number">11</span> Conclusão</h1>
+<p>O desenvolvimento do <strong>App Sísmica</strong> consolidou uma solução moderna, robusta e escalável para o pré-processamento de dados geofísicos. Ao longo deste relatório, demonstramos como a aplicação atende aos rigorosos requisitos do projeto ao desacoplar a interface gráfica das complexas regras de negócio por meio de <em>Protocols</em> e injeção de dependências. Detalhamos também a estratégia fundamental de leitura e escrita incremental (<em>streaming</em> em lotes), que comprovou, através de benchmarks, a capacidade de processar gigabytes de dados sísmicos mantendo o consumo de memória RAM baixo e estritamente controlado.</p>
+<p>Além disso, foram exibidos os cuidados com a resiliência e usabilidade da ferramenta. O sistema de orquestração de trabalhos em <em>background</em>, aliado a validações matemáticas rígidas (como o respeito à Frequência de Nyquist), protege a integridade física do dado gerado e garante que a interface permaneça plenamente responsiva. A inclusão de funcionalidades extras — tais como paralelismo <em>multi-core</em>, módulo de visualização (<em>Quality Control</em> interativo), logs persistidos por execução e testes automatizados (unitários e de ponta a ponta) — eleva o grau de maturidade do software.</p>
+<p>Em suma, o App Sísmica se estabelece não apenas como uma resposta técnica ao desafio de manipulação de grandes volumes no formato SEG-Y, mas como uma ferramenta confiável e expansível, preparada para integrar-se ao fluxo de trabalho diário de analistas e geofísicos sem apresentar os tradicionais gargalos de limite de <em>hardware</em>.</p>
+</section>
+<section id="referências" class="level1" data-number="12">
+<h1 data-number="12"><span class="header-section-number">12</span> Referências</h1>
+<div id="refs" class="references csl-bib-body" data-entry-spacing="1" role="list">
+<div id="ref-alves2017accelerating" class="csl-entry" role="listitem">
+ALVES, M. M., PESTANA, R. da C., SILVA, R. A. P. da, <em>et al.</em> "Accelerating Pre-stack Kirchhoff Time Migration by Manual Vectorization", <strong>Concurrency and Computation: Practice and Experience</strong>, v. 29, n. 22, p. e3935, 2017. DOI: <a href="https://doi.org/10.1002/cpe.3935">10.1002/cpe.3935</a>.
+</div>
+<div id="ref-analog_devices_filters" class="csl-entry" role="listitem">
+ANALOG DEVICES. <strong>Phase Relations in Active Filters</strong>. 2024. Disponível em: <a href="https://www.analog.com/en/resources/analog-dialogue/articles/phase-relations-in-active-filters.html">https://www.analog.com/en/resources/analog-dialogue/articles/phase-relations-in-active-filters.html</a>. ([Online; accessed 17-September-2026]).
+</div>
+<div id="ref-ringing_effect_paper" class="csl-entry" role="listitem">
+<span class="nocase">LI, Y., WANG, X., <em>et al.</em></span> "A Deep CNN Model for Ringing Effect Attenuation of Vibroseis Data", <strong>ResearchGate</strong>, [Online; accessed 17-September-2026], 2026. Disponível em: <a href="https://www.researchgate.net/publication/382884472_A_Deep_CNN_Model_for_Ringing_Effect_Attenuation_of_Vibroseis_Data">https://www.researchgate.net/publication/382884472_A_Deep_CNN_Model_for_Ringing_Effect_Attenuation_of_Vibroseis_Data</a>.
+</div>
+<div id="ref-python_modules" class="csl-entry" role="listitem">
+PYTHON SOFTWARE FOUNDATION. <strong>The Python Tutorial - Modules</strong>. a2024. Disponível em: <a href="https://docs.python.org/3/tutorial/modules.html">https://docs.python.org/3/tutorial/modules.html</a>. Acesso em: 20 maio 2024.
+</div>
+<div id="ref-python_protocol" class="csl-entry" role="listitem">
+PYTHON SOFTWARE FOUNDATION. <strong>typing — Support for type hints - Protocols</strong>. b2024. Disponível em: <a href="https://docs.python.org/3/library/typing.html#protocols">https://docs.python.org/3/library/typing.html#protocols</a>. Acesso em: 20 maio 2024.
+</div>
+<div id="ref-silva2018analysis" class="csl-entry" role="listitem">
+SILVA, R. A. P. da, ALVES, M. M., BENTES, C. B., <em>et al.</em> "Analysis of Parallel and Vectorized Algorithms of Pre-Stack Kirchhoff Time Migration in Virtual Environments". 2018. <strong>Anais</strong> [...] [S.l.], IEEE, 2018. p. 1–8. DOI: <a href="https://doi.org/10.1109/WSCAD.2018.00053">10.1109/WSCAD.2018.00053</a>.
+</div>
+<div id="ref-silva2017vetorizacao" class="csl-entry" role="listitem">
+SILVA, R. A. P. da, ALVES, M. M., BENTES, C. B., <em>et al.</em> "Vetoriza<span>ç</span><span>ã</span>o e An<span>á</span>lise de Algoritmos Paralelos para a Migra<span>ç</span><span>ã</span>o Kirchhoff Pr<span>é</span>-empilhamento em Tempo". 2017. <strong>Anais</strong> [...] [S.l.], SBC, 2017. Disponível em: <a href="https://proceedings-sol.sbc.org.br/index.php/sscad/article/view/258">https://proceedings-sol.sbc.org.br/index.php/sscad/article/view/258</a>.
+</div>
+<div id="ref-butterworth_wiki" class="csl-entry" role="listitem">
+WIKIPEDIA CONTRIBUTORS. <strong>Butterworth filter — <span>Wikipedia</span><span>,</span> The Free Encyclopedia</strong>. [S.l: s.n.]. Disponível em: <a href="https://en.wikipedia.org/wiki/Butterworth_filter">https://en.wikipedia.org/wiki/Butterworth_filter</a>., 2024
+</div>
+</div>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copiada");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copiada");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>
