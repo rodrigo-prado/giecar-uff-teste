@@ -7,3 +7,5 @@ data/processed/*
 data/raw/*
 data/logs/*
 *.db
+*_files
+*.html
