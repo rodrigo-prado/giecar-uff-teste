@@ -14,7 +14,7 @@ class DBDataset(Base):
     n_crosslines = Column(Integer)
     n_samples = Column(Integer)
     sample_rate_ms = Column(Float)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
     
     jobs = relationship("DBJob", back_populates="dataset")
 
@@ -26,10 +26,11 @@ class DBJob(Base):
     cutoff_hz = Column(Float)
     order = Column(Integer)
     n_workers = Column(Integer, default=1)
+    chunk_size = Column(Integer, default=500)
     status = Column(String)
     output_path = Column(String, nullable=True)
     duration_sec = Column(Float, nullable=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
     
     dataset = relationship("DBDataset", back_populates="jobs")
 

@@ -9,6 +9,8 @@ import time
 import concurrent.futures
 from collections import deque
 import logging
+import psutil
+import os
 
 from app_seismica.core.models import Job, JobStatus, SeismicDataset, FilterParameters
 from app_seismica.core.database import init_db, DBDataset, DBJob
@@ -81,6 +83,7 @@ class FilterJobService:
                     cutoff_hz=db_job.cutoff_hz,
                     order=db_job.order,
                     n_workers=db_job.n_workers or 1,
+                    chunk_size=db_job.chunk_size or 500,
                     status=status,
                     progress=100.0 if status == JobStatus.COMPLETED else 0.0,
                     output_path=Path(db_job.output_path) if db_job.output_path else None,
@@ -135,7 +138,7 @@ class FilterJobService:
                     session.add(db_dset)
                     session.commit()
 
-    def create_filter_job(self, dataset_id: str, cutoff_hz: float, order: int, n_workers: int = 1) -> Job:
+    def create_filter_job(self, dataset_id: str, cutoff_hz: float, order: int, n_workers: int = 1, chunk_size: int = 500) -> Job:
         with self._lock:
             dataset = self._datasets.get(dataset_id)
             if not dataset:
@@ -151,6 +154,7 @@ class FilterJobService:
                     cutoff_hz=cutoff_hz,
                     order=order,
                     n_workers=n_workers,
+                    chunk_size=chunk_size,
                     status=JobStatus.CREATED.name
                 )
                 session.add(db_job)
@@ -164,6 +168,7 @@ class FilterJobService:
                 cutoff_hz=cutoff_hz,
                 order=order,
                 n_workers=n_workers,
+                chunk_size=chunk_size,
                 status=JobStatus.CREATED,
                 progress=0.0
             )
@@ -205,7 +210,7 @@ class FilterJobService:
             self._update_job_status_in_db(job)
             
         logger.info(f"Iniciando Job {job_id}")
-        logger.info(f"Parâmetros: Dataset='{dataset.name}', Frequência de Corte={job.cutoff_hz}Hz, Ordem={job.order}, Workers={job.n_workers}")
+        logger.info(f"Parâmetros: Dataset='{dataset.name}', Frequência de Corte={job.cutoff_hz}Hz, Ordem={job.order}, Workers={job.n_workers}, Chunk Size={job.chunk_size}")
             
         job_dir = self.output_dir / str(job.id)
         job_dir.mkdir(parents=True, exist_ok=True)
@@ -221,11 +226,14 @@ class FilterJobService:
         wn = job.cutoff_hz / nyq
         sos = signal.butter(job.order, wn, btype="lowpass", output="sos")
 
-        chunk_size = 500  # lê e processa em lotes de 500 traços
+        chunk_size = job.chunk_size
         total_traces = dataset.total_traces
         
         start_time = time.time()
         total_pause_time = 0.0
+        
+        process = psutil.Process(os.getpid())
+        peak_memory_mb = 0.0
 
         try:
             with segyio.open(str(dataset.source_path), mode="r", ignore_geometry=True) as sgy:
@@ -242,6 +250,11 @@ class FilterJobService:
                     
                     with concurrent.futures.ProcessPoolExecutor(max_workers=job.n_workers) as executor:
                         for start_idx in range(0, total_traces, chunk_size):
+                            # Atualiza pico de memória
+                            current_mem_mb = process.memory_info().rss / (1024 * 1024)
+                            if current_mem_mb > peak_memory_mb:
+                                peak_memory_mb = current_mem_mb
+                                
                             # Verifica pausa e contabiliza o tempo que ficou pausado
                             if pause_token and not pause_token.is_set():
                                 logger.info(f"Job pausado em {start_idx}/{total_traces} traços")
@@ -314,6 +327,7 @@ class FilterJobService:
                 self._update_job_status_in_db(job)
             
             logger.info(f"Job {job_id} concluído com sucesso em {job.duration_sec:.2f}s")
+            logger.info(f"Pico de Memória do Processo Principal: {peak_memory_mb:.2f} MB")
 
         except Exception as exc:
             if isinstance(exc, RuntimeError) and "cannot schedule new futures after shutdown" in str(exc):

@@ -63,6 +63,7 @@ class Job:
     cutoff_hz: float
     order: int
     n_workers: int = 1
+    chunk_size: int = 500
     status: JobStatus = JobStatus.CREATED
     progress: float = 0.0
     output_path: Optional[Path] = None

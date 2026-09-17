@@ -1,12 +1,15 @@
 from pathlib import Path
 from typing import Optional
+import os
+import psutil
 
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QScrollArea,
     QLabel, QSpinBox, QDoubleSpinBox, QPushButton, 
-    QFileDialog, QMessageBox, QGroupBox, QLineEdit, QComboBox
+    QFileDialog, QMessageBox, QGroupBox, QLineEdit, QComboBox,
+    QStatusBar
 )
-from PySide6.QtCore import QThreadPool, Qt
+from PySide6.QtCore import QThreadPool, Qt, QTimer
 
 from app_seismica.core.models import JobStatus, SeismicDataset
 from app_seismica.core.segy_reader import inspect_segy_metadata
@@ -65,6 +68,13 @@ class MainWindow(QMainWindow):
         self.spn_workers.setRange(1, 32)
         self.spn_workers.setValue(4)
         layout_filter.addWidget(self.spn_workers)
+
+        layout_filter.addWidget(QLabel("Tamanho do Lote (Chunk Size):"))
+        self.spn_chunk_size = QSpinBox()
+        self.spn_chunk_size.setRange(10, 1000000)
+        self.spn_chunk_size.setSingleStep(100)
+        self.spn_chunk_size.setValue(500)
+        layout_filter.addWidget(self.spn_chunk_size)
 
         # Botão para adicionar o job foi movido para cá
         self.btn_executar = QPushButton("Adicionar à Fila")
@@ -126,6 +136,29 @@ class MainWindow(QMainWindow):
         self.all_job_cards = {}  # Mapeia job_id -> JobCard
 
         self._restore_jobs()
+        
+        # Configuração do Monitoramento de Memória no Rodapé
+        self.status_bar = QStatusBar()
+        self.setStatusBar(self.status_bar)
+        
+        self.process = psutil.Process(os.getpid())
+        self.peak_memory_mb = 0.0
+        
+        self.memory_timer = QTimer(self)
+        self.memory_timer.timeout.connect(self.update_memory_usage)
+        self.memory_timer.start(1000) # Atualiza a cada 1 segundo
+
+    def update_memory_usage(self):
+        try:
+            current_mem_mb = self.process.memory_info().rss / (1024 * 1024)
+            if current_mem_mb > self.peak_memory_mb:
+                self.peak_memory_mb = current_mem_mb
+                
+            self.status_bar.showMessage(
+                f"Uso de Memória RAM (App): {current_mem_mb:.1f} MB  |  Pico Histórico: {self.peak_memory_mb:.1f} MB"
+            )
+        except Exception:
+            pass
 
     def apply_filters(self):
         filter_id = self.txt_filter_id.text().strip().lower()
@@ -217,6 +250,7 @@ class MainWindow(QMainWindow):
         cutoff = self.spn_cutoff.value()
         order = self.spn_order.value()
         n_workers = self.spn_workers.value()
+        chunk_size = self.spn_chunk_size.value()
 
         if cutoff >= self.current_dataset.nyquist_frequency_hz:
             QMessageBox.critical(
@@ -226,7 +260,7 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            job = self.service.create_filter_job(self.current_dataset.id, cutoff, order, n_workers)
+            job = self.service.create_filter_job(self.current_dataset.id, cutoff, order, n_workers, chunk_size)
 
             # Criar e adicionar o card à UI no topo
             card = JobCard(f"[{job.id}] {self.current_dataset.name}", cutoff, order, job.n_workers)
