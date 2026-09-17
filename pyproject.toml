@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "app_seismica"
+version = "0.1.0"
+description = "Aplicativo para processamento de dados sísmicos"
+authors = [
+    { name = "Giecar UFF" }
+]
+dependencies = [
+    "pytest",
+    "numpy",
+    "scipy",
+    "h5py",
+    "segyio",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+env_files = [".env"]
+
+[tool.pyright]
+include = ["src", "tests"]
+extraPaths = ["src"]

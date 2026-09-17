@@ -1,0 +1,11 @@
+.env
+.venv
+.vscode
+__pycache__
+
+data/processed/*
+data/raw/*
+data/logs/*
+*.db
+*_files
+*.html
