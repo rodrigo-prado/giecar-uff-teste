@@ -8,6 +8,7 @@ import segyio
 import time
 import concurrent.futures
 from collections import deque
+import logging
 
 from app_seismica.core.models import Job, JobStatus, SeismicDataset, FilterParameters
 from app_seismica.core.database import init_db, DBDataset, DBJob
@@ -24,6 +25,9 @@ class FilterJobService:
         output_dir.mkdir(parents=True, exist_ok=True)
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        
+        self.logs_dir = project_root / "data" / "logs" / "jobs"
+        self.logs_dir.mkdir(parents=True, exist_ok=True)
         
         # Initialize SQLite database
         db_path = f"sqlite:///{project_root / 'data' / 'metadata.db'}"
@@ -63,6 +67,12 @@ class FilterJobService:
                     status = JobStatus.FAILED
                     db_job.status = status.name
                     session.commit()
+                    
+                    # Registra a falha no log do respectivo job
+                    job_id_str = str(db_job.id)
+                    logger = self._get_job_logger(job_id_str)
+                    logger.error("Job marcado como FAILED (Falha) pois a aplicação foi encerrada inesperadamente antes da sua conclusão.")
+                    self._close_job_logger(job_id_str)
 
                 job_id = str(db_job.id)
                 job = Job(
@@ -78,6 +88,33 @@ class FilterJobService:
                 )
                 self._jobs[job_id] = job
                 self._cancel_tokens[job_id] = threading.Event()
+
+    def _get_job_logger(self, job_id: str) -> logging.Logger:
+        logger_name = f"JobLogger_{job_id}"
+        logger = logging.getLogger(logger_name)
+        
+        # Se o logger já tem handlers configurados, retornamos para não duplicar
+        if logger.handlers:
+            return logger
+            
+        logger.setLevel(logging.INFO)
+        log_file = self.logs_dir / f"job_{job_id}.log"
+        fh = logging.FileHandler(log_file, encoding='utf-8')
+        fh.setLevel(logging.INFO)
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        fh.setFormatter(formatter)
+        logger.addHandler(fh)
+        
+        # Remove propagation to avoid cluttering root logger
+        logger.propagate = False
+        return logger
+
+    def _close_job_logger(self, job_id: str):
+        logger_name = f"JobLogger_{job_id}"
+        logger = logging.getLogger(logger_name)
+        for handler in logger.handlers[:]:
+            handler.close()
+            logger.removeHandler(handler)
 
     def register_dataset(self, dataset: SeismicDataset) -> None:
         with self._lock:
@@ -154,14 +191,21 @@ class FilterJobService:
         cancel_token: Optional[threading.Event] = None,
         pause_token: Optional[threading.Event] = None
     ) -> None:
+        logger = self._get_job_logger(job_id)
+        
         with self._lock:
             job = self._jobs.get(job_id)
             if not job:
+                logger.error(f"Tentativa de rodar job inexistente: {job_id}")
+                self._close_job_logger(job_id)
                 raise KeyError(f"Job '{job_id}' não encontrado.")
             dataset = self._datasets[job.dataset_id]
             token = cancel_token or self._cancel_tokens[job_id]
             job.status = JobStatus.RUNNING
             self._update_job_status_in_db(job)
+            
+        logger.info(f"Iniciando Job {job_id}")
+        logger.info(f"Parâmetros: Dataset='{dataset.name}', Frequência de Corte={job.cutoff_hz}Hz, Ordem={job.order}, Workers={job.n_workers}")
             
         job_dir = self.output_dir / str(job.id)
         job_dir.mkdir(parents=True, exist_ok=True)
@@ -170,6 +214,7 @@ class FilterJobService:
         output_name = f"{dataset.source_path.stem}_filtered.h5"
         output_h5 = job_dir / output_name
         job.output_path = output_h5
+        logger.info(f"Arquivo de saída: {output_h5}")
 
         # Projeto do filtro Butterworth passa-baixa em Second-Order Sections (SOS)
         nyq = dataset.nyquist_frequency_hz
@@ -199,17 +244,22 @@ class FilterJobService:
                         for start_idx in range(0, total_traces, chunk_size):
                             # Verifica pausa e contabiliza o tempo que ficou pausado
                             if pause_token and not pause_token.is_set():
+                                logger.info(f"Job pausado em {start_idx}/{total_traces} traços")
                                 p_start = time.time()
                                 pause_token.wait()
-                                total_pause_time += (time.time() - p_start)
+                                pause_dur = time.time() - p_start
+                                total_pause_time += pause_dur
+                                logger.info(f"Job retomado. Tempo em pausa: {pause_dur:.2f}s")
                                 
                             # Ponto de checagem cooperativo de cancelamento
                             if token.is_set():
+                                logger.info("Sinal de cancelamento detectado")
                                 executor.shutdown(wait=False, cancel_futures=True)
                                 with self._lock:
                                     job.status = JobStatus.CANCELLED
                                     self._update_job_status_in_db(job)
                                 self._cleanup_partial_output(output_h5)
+                                logger.info("Job cancelado com sucesso")
                                 return
 
                             end_idx = min(start_idx + chunk_size, total_traces)
@@ -238,11 +288,13 @@ class FilterJobService:
                         # Descarrega os restantes
                         while active_futures:
                             if token.is_set():
+                                logger.info("Sinal de cancelamento detectado no descarregamento de chunks")
                                 executor.shutdown(wait=False, cancel_futures=True)
                                 with self._lock:
                                     job.status = JobStatus.CANCELLED
                                     self._update_job_status_in_db(job)
                                 self._cleanup_partial_output(output_h5)
+                                logger.info("Job cancelado com sucesso")
                                 return
                                 
                             s_idx, e_idx, f = active_futures.popleft()
@@ -260,14 +312,26 @@ class FilterJobService:
                 job.progress = 100.0
                 job.duration_sec = (time.time() - start_time) - total_pause_time
                 self._update_job_status_in_db(job)
+            
+            logger.info(f"Job {job_id} concluído com sucesso em {job.duration_sec:.2f}s")
 
         except Exception as exc:
-            with self._lock:
-                job.status = JobStatus.FAILED
-                job.error_message = str(exc)
-                self._update_job_status_in_db(job)
+            if isinstance(exc, RuntimeError) and "cannot schedule new futures after shutdown" in str(exc):
+                logger.warning(f"Processamento do Job {job_id} interrompido porque a aplicação está sendo encerrada.")
+                with self._lock:
+                    job.status = JobStatus.FAILED
+                    job.error_message = "Aplicação encerrada abruptamente durante execução."
+                    self._update_job_status_in_db(job)
+            else:
+                logger.exception(f"Erro fatal durante a execução do Job {job_id}: {exc}")
+                with self._lock:
+                    job.status = JobStatus.FAILED
+                    job.error_message = str(exc)
+                    self._update_job_status_in_db(job)
             self._cleanup_partial_output(output_h5)
             raise
+        finally:
+            self._close_job_logger(job_id)
 
     def cancel_job(self, job_id: str) -> bool:
         with self._lock:
